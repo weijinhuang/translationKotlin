@@ -1,14 +1,16 @@
 package com.hwj.translation.bean
 
 class Language {
-    var languageId: String? = null
+    var languageId: Int? = null
 
     var languageName: String? = null
+
+    var languageDes: String? = null
 
     var projectId:String? = null
 
     override fun toString(): String {
-        return "Language(languageId=$languageId, languageName=$languageName, projectId=$projectId)"
+        return "Language(languageId=$languageId, languageName=$languageName, languageDes=$languageDes, projectId=$projectId)"
     }
 
 

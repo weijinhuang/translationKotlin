@@ -6,9 +6,27 @@ import com.hwj.translation.bean.Translation
 
 interface TranslationDao {
 
+
+    fun getAllProject(): List<Project>
+
+    fun addProject(project: Project): Boolean
+
+    fun queryProjectsByProjectId(projectId: String): List<Project?>?
+
+
+    fun addLanguage(languageDes: String, languageName: String, projectId: String): Boolean
+
+    fun deleteLanguage(languageId: Int): Boolean
+
+    fun queryLanguageByLanguageName(languageName: String, projectId: String): List<Language?>?
+
+    fun getLanguageList(projectId: String): List<Language>
+
+
     fun getAllTranslationByProjectId(projectId: String): List<Translation>
 
-    fun queryTranslationByKey(key: String, projectId: String, languageId: String): List<Translation>
+    fun queryTranslationByKeyInLanguage(key: String, projectId: String, languageId: Int): List<Translation>
+    fun queryTranslationByModule(moduleId: Int, projectId: String): List<Translation>
 
     fun addTranslation(translation: Translation): Boolean
 
@@ -16,23 +34,19 @@ interface TranslationDao {
 
     fun deleteTranslationByKey(translationKey: String, projectId: String): Boolean
 
-    fun addLanguage(languageId: String, languageName: String, projectId: String): Boolean
-
-    fun getAllProject(): List<Project>
-
-    fun addProject(project: Project): Boolean
-
-    fun queryProjectByPackageName(projectId: String): Project?
-
-    fun queryProjectsByPackageName(projectId: String): List<Project?>?
-
-    fun queryLanguageByLanguageId(languageId: String, projectId: String): List<Language?>?
-
-    fun getLanguageList(projectId: String): List<Language>
-
-    fun deleteTranslationByLanguageId(projectId: String, languageId: String): Boolean
+    fun deleteTranslationByLanguageId(projectId: String, languageId: Int): Boolean
 
     fun deleteTranslationByTranslationKey(projectId: String, translationKey: String): Boolean
 
-    fun deleteLanguage(language: Language): Boolean
+
+    /**Module*/
+    fun addModule(moduleName: String, projectId: String):Boolean
+
+    fun deleteModule(moduleId: Int, projectId: String):Boolean
+
+    fun getAllModules(projectId:String):List<com.hwj.translation.bean.Module>
+
+    fun queryModuleByName(moduleName:String,projectId:String):List<com.hwj.translation.bean.Module>
+    fun queryModuleById(moduleId:Int,projectId:String):List<com.hwj.translation.bean.Module>
+
 }
