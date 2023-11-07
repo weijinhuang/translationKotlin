@@ -67,7 +67,7 @@ class TranslationDaoImpl : TranslationDao {
 
     override fun deleteLanguage(languageId: Int): Boolean {
         val sqlStr =
-            "DELETE FROM tb_language WHERE languageId='$languageId"
+            "DELETE FROM tb_language WHERE languageId='$languageId'"
         println("sqlStr -> $sqlStr")
         return try {
             mJdbcTemplate.execute(sqlStr)
@@ -100,10 +100,9 @@ class TranslationDaoImpl : TranslationDao {
         projectId: String,
         languageId: Int
     ): List<Translation> {
-        val sqlStr = "SELECT * FROM tb_translation WHERE translationKey=? AND projectId=? AND languageId=?"
+        val sqlStr = "SELECT * FROM tb_translation WHERE translationKey='$key' AND projectId='$projectId' AND languageId='$languageId'"
         println("sqlStr -> $sqlStr")
-        val params = arrayOf<Any>(key, projectId, languageId)
-        return mJdbcTemplate.query(sqlStr, params, BeanPropertyRowMapper(Translation::class.java))
+        return mJdbcTemplate.query(sqlStr, BeanPropertyRowMapper(Translation::class.java))
     }
 
     override fun addTranslation(translation: Translation): Boolean {
@@ -119,16 +118,9 @@ class TranslationDaoImpl : TranslationDao {
 //                    } else {
 //                    }
                         val sqlStr =
-                            "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES(?,?,?,?,?)"
+                            "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES('$key', '$languageId', '${translation.translationContent}', '$projectId', '$moduleId')"
                         println("sqlStr -> $sqlStr")
-                        mJdbcTemplate.update(
-                            sqlStr,
-                            key,
-                            languageId,
-                            translation.translationContent,
-                            projectId,
-                            moduleId
-                        ) > 0
+                        mJdbcTemplate.update(sqlStr) > 0
                     }
 
                 }
