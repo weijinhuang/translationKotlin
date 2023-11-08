@@ -117,6 +117,7 @@ class TranslationDaoImpl : TranslationDao {
 //                        updateTranslation(translation)
 //                    } else {
 //                    }
+                        translation.translationContent = translation.translationContent?.replace("\\","\\\\")
                         val sqlStr =
                             "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES('$key', '$languageId', '${translation.translationContent}', '$projectId', '$moduleId')"
                         println("sqlStr -> $sqlStr")
