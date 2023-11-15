@@ -10,11 +10,13 @@ class Translation() {
 
     var translationContent: String? = null
 
+    var oldTranslationContent: String? = null
+
     var projectId: String? = null
 
     var moduleId: Int? = null
 
-    var forceAdd:Boolean = false
+    var forceAdd: Boolean = false
 
     override fun toString(): String {
         return "Translation(translationId=$translationId, translationKey=$translationKey, languageId=$languageId, translationContent=$translationContent, projectId=$projectId,forceAdd=$forceAdd)"

@@ -111,15 +111,11 @@ class TranslationDaoImpl : TranslationDao {
                 translation.translationKey?.let { key ->
                     translation.languageId?.let { languageId ->
                         val moduleId = translation.moduleId ?: -1
-//                    val queryTranslationByKey = queryTranslationByKey(key, projectId, languageId)
-//                    if (queryTranslationByKey.isNotEmpty()) {
-//                        println("已有翻译，更新")
-//                        updateTranslation(translation)
-//                    } else {
-//                    }
-                        translation.translationContent = translation.translationContent?.replace("\\","\\\\")
+                        translation.translationContent = translation.translationContent?.replace("\\", "\\\\")
+//                            ?.replace("'", "\'")?.replace("\"", "\\\"")
                         val sqlStr =
-                            "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES('$key', '$languageId', '${translation.translationContent}', '$projectId', '$moduleId')"
+                            """INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES("$key", "$languageId", "${translation.translationContent}", "$projectId", "$moduleId")"""
+
                         println("sqlStr -> $sqlStr")
                         mJdbcTemplate.update(sqlStr) > 0
                     }

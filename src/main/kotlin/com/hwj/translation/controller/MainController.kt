@@ -201,7 +201,12 @@ class MainController {
                                         projectId,
                                         languageId
                                     )
-                                add = translationDB.isEmpty()
+                                if (translationDB.isNotEmpty()) {
+                                    add = false
+                                    tranlation.oldTranslationContent = translationDB.get(0).translationContent
+                                } else {
+                                    add = true
+                                }
                             }
                             if (add) {
                                 var module = com.hwj.translation.bean.Module()
@@ -214,7 +219,7 @@ class MainController {
                                     if (!addModuleResult) {
                                         return CommonResponse(-1, "add mudle failed", emptyList())
                                     }
-                                }else{
+                                } else {
                                     module = moduleDB[0]
                                 }
                                 tranlation.moduleId = module.moduleId
@@ -234,7 +239,7 @@ class MainController {
             if (failedList.isNotEmpty()) {
                 print("")
             }
-            CommonResponse(if (failedList.isEmpty()) 200 else -1, "success", failedList)
+            CommonResponse(200, "success", failedList)
         } catch (e: Exception) {
             CommonResponse(-1, e.message, emptyList())
         }
