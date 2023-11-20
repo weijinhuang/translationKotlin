@@ -203,7 +203,9 @@ class MainController {
                                     )
                                 if (translationDB.isNotEmpty()) {
                                     add = false
-                                    tranlation.oldTranslationContent = translationDB.get(0).translationContent
+                                    if (tranlation.translationContent != translationDB[0].translationContent) {
+                                        tranlation.oldTranslationContent = translationDB[0].translationContent
+                                    }
                                 } else {
                                     add = true
                                 }
@@ -229,7 +231,9 @@ class MainController {
                                     failedList.add(tranlation)
                                 }
                             } else {
-                                failedList.add(tranlation)
+                                if (!tranlation.oldTranslationContent.isNullOrEmpty()) {
+                                    failedList.add(tranlation)
+                                }
                             }
                         }
                     }
