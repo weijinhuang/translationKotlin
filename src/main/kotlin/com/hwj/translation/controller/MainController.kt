@@ -2,6 +2,7 @@ package com.hwj.translation.controller
 
 import com.hwj.translation.bean.CommonResponse
 import com.hwj.translation.bean.Language
+import com.hwj.translation.bean.Module
 import com.hwj.translation.bean.Project
 import com.hwj.translation.bean.Translation
 import com.hwj.translation.bean.param.DeleteTranslationParam
@@ -186,8 +187,11 @@ class MainController {
     @CrossOrigin
     @PostMapping("/addTranslations")
     fun addTranslations(@RequestBody translationList: List<Translation>): CommonResponse<List<Translation>> {
-        println("addTranslations:${translationList.size}")
+        println("新增翻译:${translationList.size}")
         val failedList = mutableListOf<Translation>()
+
+        val moduleCaches = HashMap<Int, com.hwj.translation.bean.Module>()
+
         return try {
             translationList.forEach { tranlation ->
                 tranlation.projectId?.let { projectId ->
@@ -211,27 +215,33 @@ class MainController {
                                 }
                             }
                             if (add) {
-                                var module = com.hwj.translation.bean.Module()
-                                var moduleDB = mTranslationDao.queryModuleById(tranlation.moduleId ?: 0, projectId)
-                                if (moduleDB.isEmpty()) {
-                                    module.moduleName = ""
-                                    module.projectId = projectId
-                                    var addModuleResult =
-                                        mTranslationDao.addModule(module.moduleName, module.projectId!!)
-                                    if (!addModuleResult) {
-                                        return CommonResponse(-1, "add mudle failed", emptyList())
+                                var module = moduleCaches.get(tranlation.moduleId)
+                                if (module == null) {
+                                    var moduleDB = mTranslationDao.queryModuleById(tranlation.moduleId ?: 0, projectId)
+                                    if (moduleDB.isEmpty()) {
+                                        module = Module()
+                                        module.moduleName = ""
+                                        module.projectId = projectId
+                                        var addModuleResult =
+                                            mTranslationDao.addModule(module.moduleName, module.projectId!!)
+                                        if (!addModuleResult) {
+                                            return CommonResponse(-1, "add mudle failed", emptyList())
+                                        }
+                                    } else {
+                                        module = moduleDB[0]
+                                        moduleCaches.put(tranlation.moduleId ?: 0, module)
                                     }
-                                } else {
-                                    module = moduleDB[0]
                                 }
                                 tranlation.moduleId = module.moduleId
                                 val success = mTranslationDao.addTranslation(tranlation)
-                                print("添加结果：$success $tranlation")
+
                                 if (!success) {
+                                    print(" ${tranlation.translationKey} 添加失败, content:${tranlation.translationContent}")
                                     failedList.add(tranlation)
                                 }
                             } else {
                                 if (!tranlation.oldTranslationContent.isNullOrEmpty()) {
+                                    print(" ${tranlation.translationKey} 已存在")
                                     failedList.add(tranlation)
                                 }
                             }
@@ -253,7 +263,7 @@ class MainController {
     @CrossOrigin
     @PostMapping("/updateTranslations")
     fun updateTranslations(@RequestBody translationList: List<Translation>?): CommonResponse<List<Translation>> {
-        println("updateTranslations:${translationList?.size}")
+        println("更新翻译:${translationList?.size}")
         if (translationList.isNullOrEmpty()) {
             return CommonResponse(200, "", emptyList())
         }
