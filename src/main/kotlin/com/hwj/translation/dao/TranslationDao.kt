@@ -9,6 +9,7 @@ interface TranslationDao {
 
     fun getAllProject(): List<Project>
 
+    fun deleteProject(project: Project):Boolean
     fun addProject(project: Project): Boolean
 
     fun queryProjectsByProjectId(projectId: String): List<Project?>?
@@ -38,6 +39,7 @@ interface TranslationDao {
 
     fun deleteTranslationByTranslationKey(projectId: String, translationKey: String): Boolean
 
+    fun deleteTranslationByProjectId(projectId:String):Boolean
 
     /**Module*/
     fun addModule(moduleName: String, projectId: String):Boolean

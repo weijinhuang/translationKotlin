@@ -148,6 +148,28 @@ class MainController {
         }
     }
 
+
+    @CrossOrigin
+    @RequestMapping("/deleteProject")
+    fun deleteProject(@RequestBody project: Project): CommonResponse<Void> {
+        return try {
+            if (project.projectId.isNullOrEmpty()) {
+                println("参数错误:projectId为空")
+                CommonResponse(-1, "参数错误：projectId为空", null)
+            } else {
+                val result = mTranslationDao.deleteProject(project)
+                if (result) {
+                    CommonResponse(200, "删除成功", null)
+                } else {
+                    CommonResponse(-1, "删除失败", null)
+                }
+            }
+        } catch (e: Exception) {
+            CommonResponse(-1, e.message, null)
+        }
+
+    }
+
     @CrossOrigin
     @RequestMapping("addProject")
     fun addProject(

@@ -19,11 +19,25 @@ class TranslationDaoImpl : TranslationDao {
 
     /**-------Project---------*/
 
+
     override fun addProject(project: Project): Boolean {
         return try {
             val sqlStr = "INSERT INTO TB_PROJECT(projectId,projectName) VALUES(?,?)"
             println("sqlStr -> $sqlStr")
             mJdbcTemplate.update(sqlStr, project.projectId, project.projectName) > 0
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    override fun deleteProject(project: Project): Boolean {
+        return try {
+            deleteTranslationByProjectId(projectId = project.projectId!!)
+            val sqlStr = "DELETE FROM tb_translation WHERE projectId='${project.projectId}'"
+            println("sqlStr -> $sqlStr")
+            mJdbcTemplate.execute(sqlStr)
+            true
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
             false
@@ -178,6 +192,17 @@ class TranslationDaoImpl : TranslationDao {
         }
     }
 
+    override fun deleteTranslationByProjectId(projectId: String): Boolean {
+        val sqlStr = "DELETE FROM tb_translation WHERE projectId='$projectId'"
+        println("sqlStr -> $sqlStr")
+        return try {
+            mJdbcTemplate.execute(sqlStr)
+            true
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 
     override fun addModule(moduleName: String, projectId: String): Boolean {
         val sqlStr =
