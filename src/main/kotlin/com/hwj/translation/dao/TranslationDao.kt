@@ -18,6 +18,7 @@ interface TranslationDao {
     fun addLanguage(languageDes: String, languageName: String, projectId: String): Boolean
 
     fun deleteLanguage(languageId: Int): Boolean
+    fun deleteLanguageByProjectId(projectId: String): Boolean
 
     fun queryLanguageByLanguageName(languageName: String, projectId: String): List<Language?>?
 
@@ -44,7 +45,7 @@ interface TranslationDao {
     /**Module*/
     fun addModule(moduleName: String, projectId: String):Boolean
 
-    fun deleteModule(moduleId: Int, projectId: String):Boolean
+    fun deleteModule(moduleId: Int?, projectId: String):Boolean
 
     fun getAllModules(projectId:String):List<com.hwj.translation.bean.Module>
 

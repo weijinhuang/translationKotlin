@@ -153,6 +153,7 @@ class MainController {
     @CrossOrigin
     @RequestMapping("/deleteProject")
     fun deleteProject(@RequestBody project: Project): CommonResponse<Void> {
+        print("deleteProject:$project")
         return try {
             if (project.projectId.isNullOrEmpty()) {
                 println("参数错误:projectId为空")

@@ -42,7 +42,9 @@ class TranslationDaoImpl : TranslationDao {
     override fun deleteProject(project: Project): Boolean {
         return try {
             deleteTranslationByProjectId(projectId = project.projectId!!)
-            val sqlStr = "DELETE FROM tb_translation WHERE projectId='${project.projectId}'"
+            deleteLanguageByProjectId(project.projectId!!)
+            deleteModule(null, project.projectId!!)
+            val sqlStr = "DELETE FROM tb_project WHERE projectId='${project.projectId}'"
             println("sqlStr -> $sqlStr")
             mJdbcTemplate.execute(sqlStr)
             true
@@ -90,6 +92,19 @@ class TranslationDaoImpl : TranslationDao {
     override fun deleteLanguage(languageId: Int): Boolean {
         val sqlStr =
             "DELETE FROM tb_language WHERE languageId='$languageId'"
+        println("sqlStr -> $sqlStr")
+        return try {
+            mJdbcTemplate.execute(sqlStr)
+            true
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    override fun deleteLanguageByProjectId(projectId: String): Boolean {
+        val sqlStr =
+            "DELETE FROM tb_language WHERE projectId='$projectId'"
         println("sqlStr -> $sqlStr")
         return try {
             mJdbcTemplate.execute(sqlStr)
@@ -282,8 +297,12 @@ class TranslationDaoImpl : TranslationDao {
         }
     }
 
-    override fun deleteModule(moduleId: Int, projectId: String): Boolean {
-        val sqlStr = "DELETE FROM TB_FUNCTION_MODULE WHERE moduleId='$moduleId' AND projectId='$projectId'"
+    override fun deleteModule(moduleId: Int?, projectId: String): Boolean {
+        val sqlStr = if (null == moduleId) {
+            "DELETE FROM TB_FUNCTION_MODULE WHERE projectId='$projectId'"
+        } else {
+            "DELETE FROM TB_FUNCTION_MODULE WHERE moduleId='$moduleId' AND projectId='$projectId'"
+        }
         println("sqlStr -> $sqlStr")
         return try {
             mJdbcTemplate.execute(sqlStr)
