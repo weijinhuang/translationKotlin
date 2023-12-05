@@ -138,7 +138,7 @@ class TranslationDaoImpl : TranslationDao {
         languageId: Int
     ): List<Translation> {
         val sqlStr =
-            "SELECT * FROM tb_translation WHERE translationKey='$key' AND projectId='$projectId' AND languageId='$languageId'"
+            "SELECT * FROM tb_translation WHERE translationKey='${key.trim()}' AND projectId='$projectId' AND languageId='$languageId'"
 //        println("sqlStr -> $sqlStr")
         return mJdbcTemplate.query(sqlStr, BeanPropertyRowMapper(Translation::class.java))
     }
@@ -174,16 +174,23 @@ class TranslationDaoImpl : TranslationDao {
 //                            }
 //                            mAddTranslationPrepareStatement!!
 //                        } > 0
+                        try {
+                            mJdbcTemplate.update(
+                                sqlStr2
+                            ) {
+                                it.setString(1, key.trim())
+                                it.setInt(2, languageId)
+                                it.setString(3, translation.translationContent?.trim())
+                                it.setString(4, projectId)
+                                it.setInt(5, moduleId)
+                            } > 0
+                        }catch (e:Exception){
+                            print("Key:$key -> ${translation.translationContent}")
+                            e.printStackTrace()
+                            false
+                        }
 
-                        mJdbcTemplate.update(
-                            sqlStr2
-                        ) {
-                            it.setString(1, key)
-                            it.setInt(2, languageId)
-                            it.setString(3, translation.translationContent)
-                            it.setString(4, projectId)
-                            it.setInt(5, moduleId)
-                        } > 0
+
 
 //                        mJdbcTemplate.update(sqlStr) > 0
 
@@ -227,7 +234,7 @@ class TranslationDaoImpl : TranslationDao {
             ) {
                 it.setString(1, translation.translationKey)
                 it.setInt(2, translation.languageId ?: 0)
-                it.setString(3, translation.translationContent)
+                it.setString(3, translation.translationContent?.trim())
                 it.setString(4, projectId)
                 it.setInt(5, translation.moduleId ?: 0)
             } > 0

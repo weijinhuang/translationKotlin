@@ -1,5 +1,6 @@
 package com.hwj.translation.controller
 
+import com.google.gson.Gson
 import com.hwj.translation.bean.CommonResponse
 import com.hwj.translation.bean.Language
 import com.hwj.translation.bean.Module
@@ -311,15 +312,19 @@ class MainController {
     @GetMapping("/getAllModules/{projectId}")
     fun getAllModules(@PathVariable("projectId") projectId: String): CommonResponse<List<com.hwj.translation.bean.Module>> {
 
-        val moduleList = mTranslationDao.getAllModules(projectId)
+        var moduleList = mTranslationDao.getAllModules(projectId)
         println("getAllTranslation/$projectId -> ${moduleList.size}")
+        if (moduleList.size == 0) {
+            mTranslationDao.addModule("default", projectId)
+        }
+        moduleList = mTranslationDao.getAllModules(projectId)
         return CommonResponse(200, null, moduleList)
     }
 
 
     @CrossOrigin
     @PostMapping("/addModule")
-    fun addModule(@RequestBody module: com.hwj.translation.bean.Module): CommonResponse<Void> {
+    fun addModule(@RequestBody module: Module): CommonResponse<Void> {
         if (module.moduleName.isNullOrEmpty() || module.projectId.isNullOrEmpty()) {
             return CommonResponse(-1, "參數錯誤", null)
         }
