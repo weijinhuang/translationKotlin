@@ -107,41 +107,30 @@ class MainController {
 
     @CrossOrigin
     @RequestMapping("/sayhello")
-    fun helloWorld(): ResponseEntity<ByteArray> {
+    fun helloWorld() {
         val currentDir = System.getProperty("user.dir")
         println("当前目录：$currentDir")
         val fileDir = File("$currentDir/files")
-        fileDir.mkdirs()
-        val translationFile = File("$currentDir/files", "translation.txt")
-        val createNewFile = translationFile.createNewFile()
-        translationFile.outputStream().use {
-            it.write("test".toByteArray())
-        }
-        print("createNewFile:$createNewFile")
-        val zipFilePath = "$currentDir/files" + File.separator + "strings.zip"
-        val zipFile = File(zipFilePath)
-        zipFile.createNewFile()
-        ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFilePath))).use { zosp ->
-            FileInputStream(translationFile).use { fis ->
-                BufferedInputStream(fis).use {
-                    val entry = ZipEntry("translation.txt")
-                    zosp.putNextEntry(entry)
-                    it.copyTo(zosp, 1024)
-                }
-            }
-        }
-        val readBytes = zipFile.readBytes()
-        val headers = HttpHeaders()
-        headers.setContentDispositionFormData("attachment", "strings.zip")
-        headers.contentType = MediaType.APPLICATION_OCTET_STREAM
+        deleteCache(fileDir)
 
-        return ResponseEntity.ok().headers(headers).contentLength(readBytes.size.toLong()).body(readBytes)
+        deleteCache(File("$currentDir/cache"))
+
     }
 
 
     @CrossOrigin
     @RequestMapping("/exportTranslation/{projectId}/{platform}")
     fun exportTranslation(@PathVariable projectId: String, @PathVariable platform: String): ResponseEntity<ByteArray> {
+        println("/exportTranslation/$projectId/$platform")
+        if (platform == "android") {
+            return exportAndroid(projectId)
+        } else {
+            return exportIOS(projectId)
+        }
+
+    }
+
+    fun exportIOS(projectId: String): ResponseEntity<ByteArray> {
         val languageList = mTranslationDao.getLanguageList(projectId)
         if (languageList.isNotEmpty()) {
 
@@ -151,9 +140,103 @@ class MainController {
             val cacheDir = File("$currentDir/cache")
             if (cacheDir.exists()) {
                 cacheDir.listFiles()?.forEach {
-                    println("删除缓存${it.absolutePath}")
-                    it.deleteOnExit()
+                    deleteCache(it)
                 }
+            } else {
+                cacheDir.mkdirs()
+            }
+
+            val languageDirList: MutableList<File> = mutableListOf()
+
+            //分语言导出
+            for (language in languageList) {
+                language.languageId?.let { languageId ->
+                    val translationInLanguage: List<Translation?> = mTranslationDao.queryTranslationByLanguage(languageId, projectId)
+                    println("查询到翻译数量：${translationInLanguage.size}")
+                    translationInLanguage.let { translationList ->
+                        //创建目录
+                        val dirName = when (language.languageName) {
+                            "spa" -> "es.lproj"
+                            "fra" -> "fr.lproj"
+                            "jp" -> "ja.lproj"
+                            else -> "${language.languageName}.lproj"
+                        }
+
+                        val languageDir = File("$cacheDir/$dirName")
+                        if (!languageDir.exists()) {
+                            val success = languageDir.mkdirs()
+                            println("创建目录$languageDir $success")
+                        }
+                        languageDirList.add(languageDir)
+
+
+                        val file = File(languageDir, "Localizable.strings")
+                        file.createNewFile()
+                        println("创建${file.absolutePath}")
+                        FileOutputStream(file).use { fos ->
+                            translationList.forEach { translation ->
+                                translation?.translationKey?.let { translationKey ->
+                                    translation.translationContent?.let { translationContent ->
+                                        if (translationContent.contains("|")) {
+                                            val contentArray = translationContent.split("|")
+                                            var i = 0
+                                            contentArray.forEach { contentItem ->
+                                                fos.write("\"$translationKey\"${i++}=\"$contentItem\"\n".toByteArray())
+                                            }
+
+                                        } else {
+                                            fos.write("\"$translationKey\"=\"$translationContent\"\n".toByteArray())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            val fileDir = "$currentDir/files"
+            File(fileDir).let {files->
+                if (files.exists()) {
+                    files.listFiles()?.forEach {
+                        deleteCache(it)
+                    }
+                }else {
+                    files.mkdirs()
+                }
+            }
+
+            val zipFile = File(fileDir + File.separator + "strings.zip")
+            FileOutputStream(zipFile, false).use { output ->
+                ZipOutputStream(BufferedOutputStream(output)).use { zipOut ->
+                    addFilesToZip(cacheDir.absolutePath, "", zipOut)
+                }
+            }
+
+            println("压缩完毕：${zipFile.absolutePath}")
+            val readBytes = zipFile.readBytes()
+            val headers = HttpHeaders()
+            headers.setContentDispositionFormData("attachment", "strings.zip")
+            headers.contentType = MediaType.APPLICATION_OCTET_STREAM
+            return ResponseEntity.ok().headers(headers).contentLength(readBytes.size.toLong()).body(readBytes)
+        }
+        return ResponseEntity.ok().body(ByteArray(0))
+    }
+
+    fun exportAndroid(projectId: String): ResponseEntity<ByteArray> {
+        val languageList = mTranslationDao.getLanguageList(projectId)
+        if (languageList.isNotEmpty()) {
+
+            //创建zip目录
+            val currentDir = System.getProperty("user.dir")
+            println("当前目录：$currentDir")
+            val cacheDir = File("$currentDir/cache")
+            if (cacheDir.exists()) {
+                cacheDir.listFiles()?.forEach {
+                    deleteCache(it)
+                }
+            }else{
+                cacheDir.mkdirs()
             }
 
             val languageDirList: MutableList<File> = mutableListOf()
@@ -220,13 +303,26 @@ class MainController {
                     }
                 }
             }
-            val zipFile = File(cacheDir.absolutePath + File.separator + "strings.zip")
-            zipFile.outputStream().use { output ->
+            val fileDir = "$currentDir/files"
+            File(fileDir).let {files->
+                if (files.exists()) {
+                    files.listFiles()?.forEach {
+                        deleteCache(it)
+                    }
+                }else {
+                    files.mkdirs()
+                }
+
+            }
+
+            val zipFile = File(fileDir + File.separator + "strings.zip")
+            FileOutputStream(zipFile, false).use { output ->
                 ZipOutputStream(BufferedOutputStream(output)).use { zipOut ->
                     addFilesToZip(cacheDir.absolutePath, "", zipOut)
                 }
             }
 
+            println("压缩完毕：${zipFile.absolutePath}")
             val readBytes = zipFile.readBytes()
             val headers = HttpHeaders()
             headers.setContentDispositionFormData("attachment", "strings.zip")
@@ -234,32 +330,53 @@ class MainController {
             return ResponseEntity.ok().headers(headers).contentLength(readBytes.size.toLong()).body(readBytes)
         }
         return ResponseEntity.ok().body(ByteArray(0))
+    }
 
+    private fun deleteCache(cacheDirFile: File) {
+        if (cacheDirFile.isFile) {
+            println("删除：${cacheDirFile.absolutePath}")
+            cacheDirFile.delete()
+        } else {
+            println("遍历目录：${cacheDirFile.absolutePath}")
+            val listFiles = cacheDirFile.listFiles()
+            listFiles?.forEach {
+                if (it.isFile) {
+                    println("删除：${it.absolutePath}")
+                    it.delete()
+                } else {
+                    deleteCache(it)
+                }
+            }
+            println("删除目录：${cacheDirFile.absolutePath}")
+            cacheDirFile.delete()
+        }
     }
 
     private fun addFilesToZip(directory: String, parentDirectoryName: String, zipOut: ZipOutputStream) {
+        println(" addFilesToZip($directory: String, $parentDirectoryName: String, zipOut: ZipOutputStream)")
         val folder = File(directory)
         if (folder.exists()) {
-            for (file in folder.listFiles()) {
+            folder.listFiles()?.forEach { file ->
                 if (file.isDirectory) {
                     addFilesToZip(file.absolutePath, "$parentDirectoryName${file.name}/", zipOut)
                 } else {
                     val entryName = "$parentDirectoryName${file.name}"
+                    BufferedInputStream(FileInputStream(file)).use { fileInputStream ->
+                        val zipEntry = ZipEntry(entryName)
+                        zipOut.putNextEntry(zipEntry)
 
-                    val fileInputStream = BufferedInputStream(FileInputStream(file))
-                    val zipEntry = ZipEntry(entryName)
-                    zipOut.putNextEntry(zipEntry)
+                        var bytesRead: Int
+                        val buffer = ByteArray(1024)
+                        while (true) {
+                            bytesRead = fileInputStream.read(buffer, 0, buffer.size)
+                            if (bytesRead == -1) break
+                            zipOut.write(buffer, 0, bytesRead)
+                        }
 
-                    var bytesRead: Int
-                    val buffer = ByteArray(1024)
-                    while (true) {
-                        bytesRead = fileInputStream.read(buffer, 0, buffer.size)
-                        if (bytesRead == -1) break
-                        zipOut.write(buffer, 0, bytesRead)
+                        fileInputStream.close()
+                        zipOut.closeEntry()
                     }
 
-                    fileInputStream.close()
-                    zipOut.closeEntry()
                 }
             }
         }
