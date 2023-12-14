@@ -25,6 +25,7 @@ interface TranslationDao {
     fun getLanguageList(projectId: String): List<Language>
 
 
+    fun queryTranslationByLanguage(languageId: Int,projectId: String):List<Translation>
     fun getAllTranslationByProjectId(projectId: String): List<Translation>
 
     fun queryTranslationByKeyInLanguage(key: String, projectId: String, languageId: Int): List<Translation>

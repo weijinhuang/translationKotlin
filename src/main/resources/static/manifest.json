@@ -1,11 +1,11 @@
 {
-    "name": "hwj_translation_flutter",
-    "short_name": "hwj_translation_flutter",
+    "name": "hwj_flutter_translation_manager_system",
+    "short_name": "hwj_flutter_translation_manager_system",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Multiple platform translation flutter project",
+    "description": "A translation manager system.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

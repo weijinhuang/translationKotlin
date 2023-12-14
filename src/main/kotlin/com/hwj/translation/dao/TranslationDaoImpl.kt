@@ -1,25 +1,19 @@
 package com.hwj.translation.dao
 
-import com.google.gson.Gson
 import com.hwj.translation.bean.Language
 import com.hwj.translation.bean.Module
 import com.hwj.translation.bean.Project
 import com.hwj.translation.bean.Translation
 import com.hwj.translation.print
-import org.apache.tomcat.util.json.JSONParser
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.BeanPropertyRowMapper
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.jdbc.core.PreparedStatementCreator
-import org.springframework.jdbc.core.PreparedStatementSetter
 import org.springframework.stereotype.Service
-import java.sql.Connection
 import java.sql.PreparedStatement
 
 @Service("translationDaoImpl")
 class TranslationDaoImpl : TranslationDao {
 
-    val gson = Gson()
 
     @Autowired
     private lateinit var mJdbcTemplate: JdbcTemplate
@@ -119,6 +113,11 @@ class TranslationDaoImpl : TranslationDao {
 
 
     /**-------Translation---------*/
+    override fun queryTranslationByLanguage(languageId: Int, projectId: String): List<Translation> {
+        val sqlStr = "SELECT * FROM tb_translation WHERE projectId='$projectId' AND languageId='$languageId'"
+        println("sqlStr -> $sqlStr")
+        return mJdbcTemplate.query(sqlStr, BeanPropertyRowMapper(Translation::class.java))
+    }
 
     override fun getAllTranslationByProjectId(projectId: String): List<Translation> {
         val sqlStr = "SELECT * FROM tb_translation WHERE projectId='$projectId'"
@@ -143,37 +142,15 @@ class TranslationDaoImpl : TranslationDao {
         return mJdbcTemplate.query(sqlStr, BeanPropertyRowMapper(Translation::class.java))
     }
 
-    private var mAddTranslationPrepareStatement: PreparedStatement? = null
     override fun addTranslation(translation: Translation): Boolean {
+        println("新增翻译：$translation")
         return try {
             translation.projectId?.let { projectId ->
                 translation.translationKey?.let { key ->
                     translation.languageId?.let { languageId ->
                         val moduleId = translation.moduleId ?: -1
-//                        translation.translationContent = gson.toJson(translation.translationContent)
-//                        translation.translationContent = translation.translationContent?.replace("\\", "\\\\")
-//                            ?.replace("'", "\'")?.replace("\"", "\\\"")
-//                        val sqlStr =
-//                            """INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES("$key", "$languageId", ${translation.translationContent}, "$projectId", "$moduleId")"""
 
-//                        println("sqlStr -> $sqlStr")
-
-                        val sqlStr2 =
-                            "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES(?,?,?,?,?)"
-
-//                        mJdbcTemplate.update { con ->
-//                            if (null == mAddTranslationPrepareStatement) {
-//                                mAddTranslationPrepareStatement = con.prepareStatement(sqlStr2)
-//                            }
-//                            mAddTranslationPrepareStatement?.let {
-//                                it.setString(1, key)
-//                                it.setInt(2, languageId)
-//                                it.setString(3, translation.translationContent)
-//                                it.setString(4, projectId)
-//                                it.setInt(5, moduleId)
-//                            }
-//                            mAddTranslationPrepareStatement!!
-//                        } > 0
+                        val sqlStr2 = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES(?,?,?,?,?)"
                         try {
                             mJdbcTemplate.update(
                                 sqlStr2
@@ -184,17 +161,11 @@ class TranslationDaoImpl : TranslationDao {
                                 it.setString(4, projectId)
                                 it.setInt(5, moduleId)
                             } > 0
-                        }catch (e:Exception){
+                        } catch (e: Exception) {
                             print("Key:$key -> ${translation.translationContent}")
                             e.printStackTrace()
                             false
                         }
-
-
-
-//                        mJdbcTemplate.update(sqlStr) > 0
-
-
                     }
 
                 }

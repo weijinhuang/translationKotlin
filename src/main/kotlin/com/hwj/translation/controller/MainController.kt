@@ -1,36 +1,268 @@
 package com.hwj.translation.controller
 
 import com.google.gson.Gson
-import com.hwj.translation.bean.CommonResponse
-import com.hwj.translation.bean.Language
-import com.hwj.translation.bean.Module
-import com.hwj.translation.bean.Project
-import com.hwj.translation.bean.Translation
+import com.hwj.translation.baidu.MD5
+import com.hwj.translation.baidu.TransApi
+import com.hwj.translation.bean.*
+import com.hwj.translation.bean.param.BaiduTranslationParam
+import com.hwj.translation.bean.param.BaiduTranslationResult
 import com.hwj.translation.bean.param.DeleteTranslationParam
 import com.hwj.translation.bean.param.GetTranslationParam
 import com.hwj.translation.dao.TranslationDaoImpl
 import com.hwj.translation.print
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.util.*
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.OutputKeys
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
 
 @RestController
 class MainController {
+
 
     @Autowired
     private lateinit var mTranslationDao: TranslationDaoImpl
 
     @CrossOrigin
+    @RequestMapping("/translateByBaidu")
+    fun translateByBaidu(@RequestBody param: BaiduTranslationParam): CommonResponse<BaiduTranslationResult> {
+        val salt = "123456789"
+        // 签名
+        val src: String = BAIDU_APP_ID + param.q + salt + BAIDU_SCRECT
+        val md5Str = MD5.md5(src)
+        println("$src->$md5Str")
+        param.sign = md5Str
+        param.salt = salt
+        param.appid = BAIDU_APP_ID
+
+        param.encode()
+
+        println("translateByBaidu:${param.toString()}")
+
+        val baiduTranslationResultResponse =
+            RetrofitUtil.mTranslationApi.translateByBaidu(
+                param.q!!,
+                param.salt!!,
+                param.appid!!,
+                param.sign!!,
+                param.from!!,
+                param.to!!
+            ).execute()
+
+
+
+        println("baiduTranslationResultResponse:${baiduTranslationResultResponse.body().toString()}")
+        return CommonResponse(
+            baiduTranslationResultResponse.code(),
+            baiduTranslationResultResponse.message(),
+            baiduTranslationResultResponse.body()
+        )
+    }
+
+    @CrossOrigin
+    @RequestMapping("/translateByBaidu2")
+    fun translateByBaidu2(@RequestBody param: BaiduTranslationParam): CommonResponse<BaiduTranslationResult> {
+        val api = TransApi(BAIDU_APP_ID, BAIDU_SCRECT)
+        val to = param.to
+        param.to = when (to) {
+            "es" -> "spa"
+            "fr" -> "fra"
+            "ja" -> "jp"
+            else -> to
+        }
+
+        val transResult = api.getTransResult(param.q, param.from, param.to)
+        println("$param->$transResult")
+        val baiduTranslationResultResponse =
+            Gson().fromJson(transResult, BaiduTranslationResult::class.java)
+
+        return if (baiduTranslationResultResponse.error_code != null) {
+            CommonResponse(
+                -1,
+                baiduTranslationResultResponse.error_code,
+                null
+            )
+        } else {
+            CommonResponse(
+                200,
+                "",
+                baiduTranslationResultResponse
+            )
+        }
+    }
+
+
+    @CrossOrigin
     @RequestMapping("/sayhello")
-    fun helloWorld(): String {
+    fun helloWorld(): ResponseEntity<ByteArray> {
         val currentDir = System.getProperty("user.dir")
         println("当前目录：$currentDir")
         val fileDir = File("$currentDir/files")
         fileDir.mkdirs()
-        val translationFile = File("$currentDir/files", "translation.zip")
+        val translationFile = File("$currentDir/files", "translation.txt")
         val createNewFile = translationFile.createNewFile()
+        translationFile.outputStream().use {
+            it.write("test".toByteArray())
+        }
         print("createNewFile:$createNewFile")
-        return translationFile.absolutePath
+        val zipFilePath = "$currentDir/files" + File.separator + "strings.zip"
+        val zipFile = File(zipFilePath)
+        zipFile.createNewFile()
+        ZipOutputStream(BufferedOutputStream(FileOutputStream(zipFilePath))).use { zosp ->
+            FileInputStream(translationFile).use { fis ->
+                BufferedInputStream(fis).use {
+                    val entry = ZipEntry("translation.txt")
+                    zosp.putNextEntry(entry)
+                    it.copyTo(zosp, 1024)
+                }
+            }
+        }
+        val readBytes = zipFile.readBytes()
+        val headers = HttpHeaders()
+        headers.setContentDispositionFormData("attachment", "strings.zip")
+        headers.contentType = MediaType.APPLICATION_OCTET_STREAM
+
+        return ResponseEntity.ok().headers(headers).contentLength(readBytes.size.toLong()).body(readBytes)
+    }
+
+
+    @CrossOrigin
+    @RequestMapping("/exportTranslation/{projectId}/{platform}")
+    fun exportTranslation(@PathVariable projectId: String, @PathVariable platform: String): ResponseEntity<ByteArray> {
+        val languageList = mTranslationDao.getLanguageList(projectId)
+        if (languageList.isNotEmpty()) {
+
+            //创建zip目录
+            val currentDir = System.getProperty("user.dir")
+            println("当前目录：$currentDir")
+            val cacheDir = File("$currentDir/cache")
+            if (cacheDir.exists()) {
+                cacheDir.listFiles()?.forEach {
+                    println("删除缓存${it.absolutePath}")
+                    it.deleteOnExit()
+                }
+            }
+
+            val languageDirList: MutableList<File> = mutableListOf()
+
+            //分语言导出
+            for (language in languageList) {
+                language.languageId?.let { languageId ->
+                    val translationInLanguage: List<Translation?> = mTranslationDao.queryTranslationByLanguage(languageId, projectId)
+                    println("查询到翻译数量：${translationInLanguage.size}")
+                    translationInLanguage.let { translationList ->
+                        //创建目录
+                        val dirName = when (language.languageName) {
+                            "en" -> "values"
+                            "spa" -> "values-es"
+                            "fra" -> "values-fr"
+                            "jp" -> "values-ja"
+                            else -> "values-${language.languageName}"
+                        }
+
+                        val languageDir = File("$cacheDir/$dirName")
+                        if (!languageDir.exists()) {
+                            val success = languageDir.mkdirs()
+                            println("创建目录$languageDir $success")
+                        }
+                        languageDirList.add(languageDir)
+
+                        //创建xml
+                        val xmlDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
+                        val resources = xmlDoc.createElement("resources")
+                        translationList.forEach { translation ->
+                            translation?.translationKey?.let { translationKey ->
+                                translation.translationContent?.let { translationContent ->
+                                    if (translationContent.contains("|")) {
+                                        val `string-array` = xmlDoc.createElement("string-array")
+                                        `string-array`.setAttribute("name", translationKey)
+                                        val contentArray = translationContent.split("|")
+                                        contentArray.forEach { contentItem ->
+                                            val item = xmlDoc.createElement("item")
+                                            item.textContent = contentItem
+                                            `string-array`.appendChild(item)
+                                        }
+                                        resources.appendChild(`string-array`)
+                                    } else {
+                                        val string = xmlDoc.createElement("string")
+                                        string.setAttribute("name", translationKey)
+                                        string.textContent = translationContent
+                                        resources.appendChild(string)
+                                    }
+                                }
+                            }
+                        }
+                        xmlDoc.appendChild(resources)
+                        val xmlFile = File(languageDir, "strings.xml")
+                        println("创建${xmlFile.absolutePath}")
+                        val success = xmlFile.createNewFile()
+                        print("$success")
+                        val transformFactory = TransformerFactory.newInstance()
+                        val transformer = transformFactory.newTransformer()
+                        val source = DOMSource(xmlDoc)
+                        transformer.setOutputProperty(OutputKeys.INDENT, "yes")
+                        val result = StreamResult(xmlFile)
+                        transformer.transform(source, result)
+                        print("生成${xmlFile.absolutePath}")
+                    }
+                }
+            }
+            val zipFile = File(cacheDir.absolutePath + File.separator + "strings.zip")
+            zipFile.outputStream().use { output ->
+                ZipOutputStream(BufferedOutputStream(output)).use { zipOut ->
+                    addFilesToZip(cacheDir.absolutePath, "", zipOut)
+                }
+            }
+
+            val readBytes = zipFile.readBytes()
+            val headers = HttpHeaders()
+            headers.setContentDispositionFormData("attachment", "strings.zip")
+            headers.contentType = MediaType.APPLICATION_OCTET_STREAM
+            return ResponseEntity.ok().headers(headers).contentLength(readBytes.size.toLong()).body(readBytes)
+        }
+        return ResponseEntity.ok().body(ByteArray(0))
+
+    }
+
+    private fun addFilesToZip(directory: String, parentDirectoryName: String, zipOut: ZipOutputStream) {
+        val folder = File(directory)
+        if (folder.exists()) {
+            for (file in folder.listFiles()) {
+                if (file.isDirectory) {
+                    addFilesToZip(file.absolutePath, "$parentDirectoryName${file.name}/", zipOut)
+                } else {
+                    val entryName = "$parentDirectoryName${file.name}"
+
+                    val fileInputStream = BufferedInputStream(FileInputStream(file))
+                    val zipEntry = ZipEntry(entryName)
+                    zipOut.putNextEntry(zipEntry)
+
+                    var bytesRead: Int
+                    val buffer = ByteArray(1024)
+                    while (true) {
+                        bytesRead = fileInputStream.read(buffer, 0, buffer.size)
+                        if (bytesRead == -1) break
+                        zipOut.write(buffer, 0, bytesRead)
+                    }
+
+                    fileInputStream.close()
+                    zipOut.closeEntry()
+                }
+            }
+        }
     }
 
     @CrossOrigin
@@ -42,7 +274,8 @@ class MainController {
             mTranslationDao.queryTranslationByModule(getTranslationParam.moduleId!!, getTranslationParam.projectId)
         }
         println("getTranslationList -> ${translationList.size}")
-        return CommonResponse(200, null, translationList)
+
+        return CommonResponse(200, "", translationList)
     }
 
 
