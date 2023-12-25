@@ -531,7 +531,7 @@ class MainController {
         println("addProject:$project")
         return try {
             if (project.projectId.isNullOrBlank()) {
-                println("参数错误:packageName为空")
+                println("参数错误:projectId为空")
                 CommonResponse(-1, "参数错误：projectId为空", null)
             } else {
                 val queryProjectByPackageName = mTranslationDao.queryProjectsByProjectId(project.projectId!!)
@@ -564,7 +564,7 @@ class MainController {
         println("新增翻译:${translationList.size}")
         val failedList = mutableListOf<Translation>()
 
-        val moduleCaches = HashMap<Int, com.hwj.translation.bean.Module>()
+        val moduleCaches = HashMap<Int, Module>()
 
         return try {
             translationList.forEach { tranlation ->
@@ -660,7 +660,7 @@ class MainController {
 
     @CrossOrigin
     @GetMapping("/getAllModules/{projectId}")
-    fun getAllModules(@PathVariable("projectId") projectId: String): CommonResponse<List<com.hwj.translation.bean.Module>> {
+    fun getAllModules(@PathVariable("projectId") projectId: String): CommonResponse<List<Module>> {
 
         var moduleList = mTranslationDao.getAllModules(projectId)
         println("getAllTranslation/$projectId -> ${moduleList.size}")
@@ -688,7 +688,7 @@ class MainController {
 
     @CrossOrigin
     @PostMapping("/deleteModule")
-    fun deleteModule(@RequestBody module: com.hwj.translation.bean.Module): CommonResponse<Void> {
+    fun deleteModule(@RequestBody module: Module): CommonResponse<Void> {
         if (module.moduleName.isNullOrEmpty() || module.projectId.isNullOrEmpty()) {
             return CommonResponse(-1, "參數錯誤", null)
         }
