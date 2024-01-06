@@ -10,6 +10,8 @@ import com.hwj.translation.bean.param.DeleteTranslationParam
 import com.hwj.translation.bean.param.GetTranslationParam
 import com.hwj.translation.dao.TranslationDaoImpl
 import com.hwj.translation.print
+import com.hwj.translation.util.log
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -35,6 +37,9 @@ class MainController {
 
     @Autowired
     private lateinit var mTranslationDao: TranslationDaoImpl
+
+    @Autowired
+    private var mRequest: HttpServletRequest? = null
 
     @CrossOrigin
     @RequestMapping("/translateByBaidu")
@@ -108,6 +113,7 @@ class MainController {
     @CrossOrigin
     @RequestMapping("/sayhello")
     fun helloWorld() {
+        log(mRequest?.remoteAddr, "sayHello")
         val currentDir = System.getProperty("user.dir")
         println("当前目录：$currentDir")
         val fileDir = File("$currentDir/files")
@@ -121,7 +127,7 @@ class MainController {
     @CrossOrigin
     @RequestMapping("/exportTranslation/{projectId}/{platform}")
     fun exportTranslation(@PathVariable projectId: String, @PathVariable platform: String): ResponseEntity<ByteArray> {
-        println("/exportTranslation/$projectId/$platform")
+        log(mRequest?.remoteAddr, "/exportTranslation/$projectId/$platform")
         if (platform == "android") {
             return exportAndroid(projectId)
         } else {
@@ -131,6 +137,7 @@ class MainController {
     }
 
     fun exportIOS(projectId: String): ResponseEntity<ByteArray> {
+        log(mRequest?.remoteAddr, "exportIOS")
         val languageList = mTranslationDao.getLanguageList(projectId)
         if (languageList.isNotEmpty()) {
 
@@ -196,12 +203,12 @@ class MainController {
             }
 
             val fileDir = "$currentDir/files"
-            File(fileDir).let {files->
+            File(fileDir).let { files ->
                 if (files.exists()) {
                     files.listFiles()?.forEach {
                         deleteCache(it)
                     }
-                }else {
+                } else {
                     files.mkdirs()
                 }
             }
@@ -224,6 +231,7 @@ class MainController {
     }
 
     fun exportAndroid(projectId: String): ResponseEntity<ByteArray> {
+        log(mRequest?.remoteAddr, "exportAndroid")
         val languageList = mTranslationDao.getLanguageList(projectId)
         if (languageList.isNotEmpty()) {
 
@@ -235,7 +243,7 @@ class MainController {
                 cacheDir.listFiles()?.forEach {
                     deleteCache(it)
                 }
-            }else{
+            } else {
                 cacheDir.mkdirs()
             }
 
@@ -304,12 +312,12 @@ class MainController {
                 }
             }
             val fileDir = "$currentDir/files"
-            File(fileDir).let {files->
+            File(fileDir).let { files ->
                 if (files.exists()) {
                     files.listFiles()?.forEach {
                         deleteCache(it)
                     }
-                }else {
+                } else {
                     files.mkdirs()
                 }
 
@@ -385,6 +393,7 @@ class MainController {
     @CrossOrigin
     @PostMapping("/getAllTranslation")
     fun getTranslationList(@RequestBody getTranslationParam: GetTranslationParam): CommonResponse<List<Translation>> {
+        log(mRequest?.remoteAddr, "getAllTranslation")
         val translationList = if (null == getTranslationParam.moduleId) {
             mTranslationDao.getAllTranslationByProjectId(getTranslationParam.projectId)
         } else {
@@ -400,7 +409,7 @@ class MainController {
     @RequestMapping("/getLanguageList/{projectId}")
     fun getLanguageList(@PathVariable projectId: String): CommonResponse<List<Language>> {
         val languageList = mTranslationDao.getLanguageList(projectId)
-        println("getLanguageList/$projectId -> ${languageList.size}")
+        log(mRequest?.remoteAddr, "getLanguageList/$projectId -> ${languageList.size}")
         languageList.print()
         return CommonResponse(200, null, languageList)
     }
@@ -409,7 +418,7 @@ class MainController {
     @RequestMapping("getAllProjects")
     fun getProjects(): CommonResponse<List<Project>> {
         val projectList = mTranslationDao.getAllProject()
-        println("projectList -> ${projectList.size}")
+        log(mRequest?.remoteAddr, "projectList -> ${projectList.size}")
         return CommonResponse(200, null, projectList)
     }
 
@@ -417,7 +426,7 @@ class MainController {
     @CrossOrigin
     @PostMapping("/deleteLanguage")
     fun deleteLanguage(@RequestBody language: Language): CommonResponse<Void> {
-        println("deleteLanguage:$language")
+        log(mRequest?.remoteAddr, "deleteLanguage:$language")
         if (language.languageId == null || language.projectId.isNullOrBlank()) {
             return CommonResponse(-1, "参数错误", null)
         }
@@ -442,7 +451,7 @@ class MainController {
     @CrossOrigin
     @PostMapping("/deleteTranslationByKey")
     fun deleteTranslationByTranslationKey(@RequestBody deleteTranslationParam: DeleteTranslationParam): CommonResponse<Void> {
-        println("deleteTranslationByTranslationKey:$deleteTranslationParam")
+        log(mRequest?.remoteAddr, "deleteTranslationByTranslationKey:$deleteTranslationParam")
         if (deleteTranslationParam.translationKey.isNullOrBlank() || deleteTranslationParam.projectId.isNullOrBlank()) {
             return CommonResponse(-1, "参数错误", null)
         }
@@ -464,9 +473,50 @@ class MainController {
 
 
     @CrossOrigin
+    @PostMapping("/addLanguages")
+    fun addLanguages(@RequestBody languageList: List<Language>): CommonResponse<List<Language>> {
+        log(mRequest?.remoteAddr, "addLanguages:${languageList.size}")
+        val failedList = mutableListOf<Language>()
+        if (languageList.isNotEmpty()) {
+            languageList.forEach { language ->
+                try {
+                    if (language.projectId.isNullOrBlank()) {
+                        println("参数错误:projectId")
+                        failedList.add(language)
+                    } else if (language.languageName.isNullOrBlank()) {
+                        println("参数错误:languageName为空")
+                        failedList.add(language)
+                    } else {
+                        val queryLanguageList =
+                            mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
+                        if (!queryLanguageList.isNullOrEmpty()) {
+                            println("语言已存在")
+                        } else {
+                            val success = mTranslationDao.addLanguage(
+                                language.languageDes!!,
+                                language.languageName!!,
+                                language.projectId!!
+                            )
+                            if (success) {
+                                println("添加成功")
+                            } else {
+                                println("添加项目失败")
+                                failedList.add(language)
+                            }
+                        }
+                    }
+                } catch (e: java.lang.Exception) {
+                    failedList.add(language)
+                }
+            }
+        }
+        return CommonResponse(200, "", failedList)
+    }
+
+    @CrossOrigin
     @PostMapping("/addLanguage")
     fun addLanguage(@RequestBody language: Language): CommonResponse<Void> {
-        println("addLanguage:$language")
+        log(mRequest?.remoteAddr, "addLanguage:$language")
         return try {
             if (language.projectId.isNullOrBlank()) {
                 println("参数错误:projectId")
@@ -504,7 +554,7 @@ class MainController {
     @CrossOrigin
     @RequestMapping("/deleteProject")
     fun deleteProject(@RequestBody project: Project): CommonResponse<Void> {
-        print("deleteProject:$project")
+        log(mRequest?.remoteAddr, "deleteProject:$project")
         return try {
             if (project.projectId.isNullOrEmpty()) {
                 println("参数错误:projectId为空")
@@ -528,7 +578,7 @@ class MainController {
     fun addProject(
         @RequestBody project: Project
     ): CommonResponse<Void> {
-        println("addProject:$project")
+        log(mRequest?.remoteAddr, "addProject:$project")
         return try {
             if (project.projectId.isNullOrBlank()) {
                 println("参数错误:projectId为空")
@@ -561,7 +611,7 @@ class MainController {
     @CrossOrigin
     @PostMapping("/addTranslations")
     fun addTranslations(@RequestBody translationList: List<Translation>): CommonResponse<List<Translation>> {
-        println("新增翻译:${translationList.size}")
+        log(mRequest?.remoteAddr, "新增翻译:${translationList.size}")
         val failedList = mutableListOf<Translation>()
 
         val moduleCaches = HashMap<Int, Module>()
@@ -637,7 +687,7 @@ class MainController {
     @CrossOrigin
     @PostMapping("/updateTranslations")
     fun updateTranslations(@RequestBody translationList: List<Translation>?): CommonResponse<List<Translation>> {
-        println("更新翻译:${translationList?.size}")
+        log(mRequest?.remoteAddr, "更新翻译:${translationList?.size}")
         if (translationList.isNullOrEmpty()) {
             return CommonResponse(200, "", emptyList())
         }
@@ -661,9 +711,8 @@ class MainController {
     @CrossOrigin
     @GetMapping("/getAllModules/{projectId}")
     fun getAllModules(@PathVariable("projectId") projectId: String): CommonResponse<List<Module>> {
-
         var moduleList = mTranslationDao.getAllModules(projectId)
-        println("getAllTranslation/$projectId -> ${moduleList.size}")
+        log(mRequest?.remoteAddr, "/getAllModules/$projectId -> ${moduleList.size}")
         if (moduleList.size == 0) {
             mTranslationDao.addModule("default", projectId)
         }
