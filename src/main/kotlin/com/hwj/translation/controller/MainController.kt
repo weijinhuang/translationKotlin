@@ -1,5 +1,8 @@
 package com.hwj.translation.controller
 
+import com.google.auth.oauth2.GoogleCredentials
+import com.google.cloud.translate.Translate
+import com.google.cloud.translate.TranslateOptions
 import com.google.gson.Gson
 import com.hwj.translation.baidu.MD5
 import com.hwj.translation.baidu.TransApi
@@ -17,11 +20,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import java.io.BufferedInputStream
-import java.io.BufferedOutputStream
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.io.*
 import java.util.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -30,6 +29,7 @@ import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
+
 
 @RestController
 class MainController {
@@ -40,6 +40,36 @@ class MainController {
 
     @Autowired
     private var mRequest: HttpServletRequest? = null
+
+    fun loadGoogleCredentials() {
+//        val googleCredentialsFile = ""
+//        FileInputStream(googleCredentialsFile).use { fileInputStream ->
+//            val googleCredentials = GoogleCredentials.fromStream(fileInputStream)
+//            googleCredentials.refreshIfExpired()
+//            googleCredentials.accessToken
+//
+//        }
+        val translate: Translate = TranslateOptions.getDefaultInstance().service
+
+    }
+
+
+    @CrossOrigin
+    @RequestMapping("/translateByGoogle")
+    fun translateByGoogle(@RequestBody param: BaiduTranslationParam): CommonResponse<BaiduTranslationResult> {
+        System.setProperty("http.proxyHost", "127.0.0.1");
+        System.setProperty("http.proxyPort", "7890");
+        System.setProperty("https.proxyHost", "127.0.0.1");
+        System.setProperty("https.proxyPort", "7890");
+        println("TranslationByGoogle")
+        val translateService = TranslateOptions.getDefaultInstance().service
+        val detection = translateService.detect(param.q)
+        val language = detection.language
+        println("检测到语言:$language")
+        val translateResult = translateService.translate(param.q, Translate.TranslateOption.sourceLanguage(language), Translate.TranslateOption.targetLanguage(param.to))
+        println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
+        return CommonResponse(200, "", BaiduTranslationResult().apply { to = translateResult.translatedText })
+    }
 
     @CrossOrigin
     @RequestMapping("/translateByBaidu")
