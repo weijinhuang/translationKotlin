@@ -203,15 +203,13 @@ class TranslationDaoImpl : TranslationDao {
     override fun updateTranslation(translation: Translation): Boolean {
         return translation.projectId?.let { projectId ->
             val sqlStr2 =
-                "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES(?,?,?,?,?)"
+                "UPDATE TB_TRANSLATION SET translationContent=? ,translationKey=? WHERE translationId=?"
             mJdbcTemplate.update(
                 sqlStr2
             ) {
-                it.setString(1, translation.translationKey)
-                it.setInt(2, translation.languageId ?: 0)
-                it.setString(3, translation.translationContent?.trim())
-                it.setString(4, projectId)
-                it.setInt(5, translation.moduleId ?: 0)
+                it.setString(1, translation.translationContent)
+                it.setString(2, translation.translationKey)
+                it.setInt(3, translation.translationId ?: 0)
             } > 0
         } ?: false
 

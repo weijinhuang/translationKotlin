@@ -1,16 +1,12 @@
 package com.hwj.translation.controller
 
-import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.translate.Translate
 import com.google.cloud.translate.TranslateOptions
 import com.google.gson.Gson
 import com.hwj.translation.baidu.MD5
 import com.hwj.translation.baidu.TransApi
 import com.hwj.translation.bean.*
-import com.hwj.translation.bean.param.BaiduTranslationParam
-import com.hwj.translation.bean.param.BaiduTranslationResult
-import com.hwj.translation.bean.param.DeleteTranslationParam
-import com.hwj.translation.bean.param.GetTranslationParam
+import com.hwj.translation.bean.param.*
 import com.hwj.translation.dao.TranslationDaoImpl
 import com.hwj.translation.print
 import com.hwj.translation.util.log
@@ -56,24 +52,37 @@ class MainController {
 
     @CrossOrigin
     @RequestMapping("/translateByGoogle")
-    fun translateByGoogle(@RequestBody param: BaiduTranslationParam): CommonResponse<BaiduTranslationResult> {
+    fun translateByGoogle(@RequestBody param: GoogleTranslationParam): CommonResponse<TranslationResult> {
         System.setProperty("http.proxyHost", "127.0.0.1");
         System.setProperty("http.proxyPort", "7890");
         System.setProperty("https.proxyHost", "127.0.0.1");
         System.setProperty("https.proxyPort", "7890");
         println("TranslationByGoogle")
         val translateService = TranslateOptions.getDefaultInstance().service
-        val detection = translateService.detect(param.q)
-        val language = detection.language
-        println("检测到语言:$language")
-        val translateResult = translateService.translate(param.q, Translate.TranslateOption.sourceLanguage(language), Translate.TranslateOption.targetLanguage(param.to))
-        println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
-        return CommonResponse(200, "", BaiduTranslationResult().apply { to = translateResult.translatedText })
+        var sourceLanguage = param.sourceLanguage
+        if (sourceLanguage.isNullOrEmpty()) {
+            val detection = translateService.detect(param.content)
+            sourceLanguage = detection.language
+            println("检测到语言:$sourceLanguage")
+        }
+        try {
+            val translateResult = translateService.translate(param.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(param.targetLanguage))
+            println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
+            return CommonResponse(200, "", TranslationResult().apply {
+                this.sourceLanguage = param.sourceLanguage
+                targetLanguage = param.targetLanguage
+                transResult = translateResult.translatedText
+                errorCode = 0
+            })
+        }catch (e:Exception){
+            return CommonResponse(-1,"",TranslationResult().apply {  });
+        }
+
     }
 
     @CrossOrigin
     @RequestMapping("/translateByBaidu")
-    fun translateByBaidu(@RequestBody param: BaiduTranslationParam): CommonResponse<BaiduTranslationResult> {
+    fun translateByBaidu(@RequestBody param: BaiduTranslationParam): CommonResponse<TranslationResult> {
         val salt = "123456789"
         // 签名
         val src: String = BAIDU_APP_ID + param.q + salt + BAIDU_SCRECT
@@ -100,22 +109,29 @@ class MainController {
 
 
         println("baiduTranslationResultResponse:${baiduTranslationResultResponse.body().toString()}")
+        val result = TranslationResult().apply {
+            sourceLanguage = param.from
+            targetLanguage = param.to
+            transResult = baiduTranslationResultResponse.body()?.trans_result?.get(0)?.dst ?: ""
+            errorCode = baiduTranslationResultResponse.code()
+        }
         return CommonResponse(
             baiduTranslationResultResponse.code(),
             baiduTranslationResultResponse.message(),
-            baiduTranslationResultResponse.body()
+            result
         )
     }
 
     @CrossOrigin
     @RequestMapping("/translateByBaidu2")
-    fun translateByBaidu2(@RequestBody param: BaiduTranslationParam): CommonResponse<BaiduTranslationResult> {
+    fun translateByBaidu2(@RequestBody param: BaiduTranslationParam): CommonResponse<TranslationResult> {
         val api = TransApi(BAIDU_APP_ID, BAIDU_SCRECT)
         val to = param.to
         param.to = when (to) {
             "es" -> "spa"
             "fr" -> "fra"
             "ja" -> "jp"
+            "zh-CN" -> "zh"
             else -> to
         }
 
@@ -131,11 +147,20 @@ class MainController {
                 null
             )
         } else {
+             println("baiduTranslationResultResponse:${baiduTranslationResultResponse.toString()}")
+            val result = TranslationResult().apply {
+                sourceLanguage = param.from
+                targetLanguage = param.to
+                this.transResult = baiduTranslationResultResponse.trans_result?.get(0)?.dst ?: ""
+                errorCode = 0
+            }
             CommonResponse(
                 200,
                 "",
-                baiduTranslationResultResponse
+                result
             )
+
+
         }
     }
 
