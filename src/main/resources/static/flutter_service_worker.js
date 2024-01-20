@@ -3,13 +3,15 @@ const MANIFEST = 'flutter-app-manifest';
 const TEMP = 'flutter-temp-cache';
 const CACHE_NAME = 'flutter-app-cache';
 
-const RESOURCES = {"assets/AssetManifest.bin": "69a1dd2f63029cc955bf563bee9334a5",
-"assets/AssetManifest.bin.json": "24dbc7f7426b31323e0069b2569ad21b",
-"assets/AssetManifest.json": "cdb654c08aaf22579ef868f2d5ccadf1",
+const RESOURCES = {"assets/AssetManifest.bin": "d2d32c369fa366032499d45b779da7c4",
+"assets/AssetManifest.bin.json": "8abb0dcd73fe60da7dcd0807491e93e9",
+"assets/AssetManifest.json": "a003af53b505bb9fe9e71e438089baef",
 "assets/FontManifest.json": "192250eba0083a8d83f80c3b4360ad17",
 "assets/fonts/Corben/Corben-Bold.ttf": "8f9921f9c52d3c25fd354d6e01f7b024",
-"assets/fonts/MaterialIcons-Regular.otf": "9243ef3248b098c89c857b32bc4749b7",
-"assets/NOTICES": "da8f6f8c884fb38fe405c52fb9f5dc9b",
+"assets/fonts/MaterialIcons-Regular.otf": "5d056f325072c02602c47f4ddcca28c5",
+"assets/images/baidu.png": "9e3ee8ee5b50988e710658520aa4a0b6",
+"assets/images/google.png": "e073e237f6e2a0a3755490220e8920ce",
+"assets/NOTICES": "28eadc24a1696656f7e5ff9ed09286b9",
 "assets/packages/cupertino_icons/assets/CupertinoIcons.ttf": "89ed8f4e49bcdfc0b5bfc9b24591e347",
 "assets/shaders/ink_sparkle.frag": "4096b5150bac93c41cbc9b45276bd90f",
 "canvaskit/canvaskit.js": "eb8797020acdbdf96a12fb0405582c1b",
@@ -25,9 +27,9 @@ const RESOURCES = {"assets/AssetManifest.bin": "69a1dd2f63029cc955bf563bee9334a5
 "icons/Icon-512.png": "96e752610906ba2a93c65f8abe1645f1",
 "icons/Icon-maskable-192.png": "c457ef57daa1d16f64b27b786ec2ea3c",
 "icons/Icon-maskable-512.png": "301a7604d45b3e739efc881eb04896ea",
-"index.html": "9825d0dc3ad72b14f008f5cf428c8f26",
-"/": "9825d0dc3ad72b14f008f5cf428c8f26",
-"main.dart.js": "65d29afea731b9470b328d91950354eb",
+"index.html": "fc22bbf6d7b428d942f75e53a5cabf37",
+"/": "fc22bbf6d7b428d942f75e53a5cabf37",
+"main.dart.js": "85eb4f31f4ed325ed5318893ae17336a",
 "manifest.json": "4fe4bb32efa94582b096affdfee541a9",
 "version.json": "dc3df30a9450c85c5fe83e3bddb97d58"};
 // The application shell files that are downloaded before a service worker can
