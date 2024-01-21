@@ -94,6 +94,26 @@ class TranslationDaoImpl : TranslationDao {
         } > 0
     }
 
+    override fun addLanguage2(languageDes: String, languageName: String, projectId: String): Language? {
+        val sqlStr = "INSERT INTO TB_LANGUAGE(languageDes,languageName,projectId) VALUES(?,?,?)"
+        println("sqlStr -> $sqlStr")
+        val success = mJdbcTemplate.update(sqlStr) {
+            it.setString(1, languageDes)
+            it.setString(2, languageName)
+            it.setString(3, projectId)
+        } > 0
+        return if (success) {
+            val queryStr = "SELECT * FROM TB_LANGUAGE WHERE projectId=? AND languageName=?"
+            val languageList = mJdbcTemplate.query(queryStr, PreparedStatementSetter {
+                it.setString(1, projectId)
+                it.setString(2, languageName)
+            }, BeanPropertyRowMapper(Language::class.java))
+            languageList.first()
+        } else {
+            null
+        }
+    }
+
     override fun deleteLanguage(languageId: Int): Boolean {
         val sqlStr =
             "DELETE FROM tb_language WHERE languageId='$languageId'"

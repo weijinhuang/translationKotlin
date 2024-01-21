@@ -74,8 +74,8 @@ class MainController {
                 transResult = translateResult.translatedText
                 errorCode = 0
             })
-        }catch (e:Exception){
-            return CommonResponse(-1,"",TranslationResult().apply {  });
+        } catch (e: Exception) {
+            return CommonResponse(-1, "", TranslationResult().apply { });
         }
 
     }
@@ -147,7 +147,7 @@ class MainController {
                 null
             )
         } else {
-             println("baiduTranslationResultResponse:${baiduTranslationResultResponse.toString()}")
+            println("baiduTranslationResultResponse:${baiduTranslationResultResponse.toString()}")
             val result = TranslationResult().apply {
                 sourceLanguage = param.from
                 targetLanguage = param.to
@@ -650,7 +650,43 @@ class MainController {
                     })
                     if (success) {
                         println("添加成功")
+                        project.copyFromProject?.let { targetProjectId ->
+                            println("复制目标项目：${project.copyFromProject}")
+                            val oldModules = mTranslationDao.getAllModules(targetProjectId)
+                            var moduleId = 0
+                            oldModules.forEach { module ->
+                                module.projectId = project.projectId
+                                mTranslationDao.addModule(module.moduleName, projectId = project.projectId!!)
+                            }
+                            moduleId = mTranslationDao.getAllModules(project.projectId!!).first().moduleId
+                            val oldLanguages = mTranslationDao.getLanguageList(targetProjectId)
+                            oldLanguages.forEach { oldLanguage ->
+
+                                mTranslationDao.addLanguage2(oldLanguage.languageDes!!,oldLanguage.languageName!!, project.projectId!!)?.let { addLanguage ->
+                                    val oldTranslations = mTranslationDao.queryTranslationByLanguage(oldLanguage.languageId ?: 0, targetProjectId)
+                                    println("复制语言：${addLanguage},该语言下翻译数:${oldTranslations.size}")
+                                    oldTranslations.forEach { translation ->
+                                        translation.translationId = null
+                                        translation.moduleId = moduleId
+                                        translation.projectId = project.projectId
+                                        translation.languageId = addLanguage.languageId ?: 0
+
+                                        val addTranslation = mTranslationDao.addTranslation(translation)
+                                        if (addTranslation) {
+                                            println("复制翻译:$translation 成功")
+                                        } else {
+                                            println("复制翻译:$translation 失败")
+                                        }
+                                    }
+                                }
+
+
+                            }
+
+                        }
+
                         CommonResponse(200, "添加成功", null)
+
                     } else {
                         println("添加项目失败")
                         CommonResponse(-1, "添加项目失败", null)

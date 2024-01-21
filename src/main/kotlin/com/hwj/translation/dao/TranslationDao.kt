@@ -16,6 +16,7 @@ interface TranslationDao {
 
 
     fun addLanguage(languageDes: String, languageName: String, projectId: String): Boolean
+    fun addLanguage2(languageDes: String, languageName: String, projectId: String): Language?
 
     fun deleteLanguage(languageId: Int): Boolean
     fun deleteLanguageByProjectId(projectId: String): Boolean
