@@ -155,13 +155,13 @@ class TranslationDaoImpl : TranslationDao {
     }
 
     override fun getAllTranslationByProjectId(projectId: String): List<Translation> {
-        val sqlStr = "SELECT * FROM tb_translation WHERE projectId=?"
+        val sqlStr = "SELECT * FROM tb_translation WHERE projectId=? ORDER BY translationId DESC"
         println("sqlStr -> $sqlStr")
         return mJdbcTemplate.query(sqlStr, PreparedStatementSetter { it.setString(1, projectId) }, BeanPropertyRowMapper(Translation::class.java))
     }
 
     override fun queryTranslationByModule(moduleId: Int, projectId: String): List<Translation> {
-        val sqlStr = "SELECT * FROM tb_translation WHERE moduleId=? AND projectId=?"
+        val sqlStr = "SELECT * FROM tb_translation WHERE moduleId=? AND projectId=? ORDER BY translationId DESC"
         println("sqlStr -> $sqlStr")
         return mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
             it.setInt(1, moduleId)

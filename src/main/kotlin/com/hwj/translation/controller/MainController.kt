@@ -25,6 +25,7 @@ import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
+import kotlin.collections.HashMap
 
 
 @RestController
@@ -47,6 +48,21 @@ class MainController {
 //        }
         val translate: Translate = TranslateOptions.getDefaultInstance().service
 
+    }
+
+    @CrossOrigin
+    @RequestMapping("getGoogleSupportLanguage")
+    fun getGoogleSupportLanguage() {
+        System.setProperty("http.proxyHost", "127.0.0.1");
+        System.setProperty("http.proxyPort", "7890");
+        System.setProperty("https.proxyHost", "127.0.0.1");
+        System.setProperty("https.proxyPort", "7890");
+        println("TranslationByGoogle")
+        val translateService = TranslateOptions.getDefaultInstance().service
+        val listSupportedLanguages = translateService.listSupportedLanguages()
+        listSupportedLanguages.forEach {
+            println("${it.name}:${it.code}")
+        }
     }
 
 
@@ -147,7 +163,7 @@ class MainController {
                 null
             )
         } else {
-            println("baiduTranslationResultResponse:${baiduTranslationResultResponse.toString()}")
+            println("baiduTranslationResultResponse:$baiduTranslationResultResponse")
             val result = TranslationResult().apply {
                 sourceLanguage = param.from
                 targetLanguage = param.to
@@ -178,24 +194,47 @@ class MainController {
 
     }
 
-
     @CrossOrigin
-    @RequestMapping("/exportTranslation/{projectId}/{platform}")
-    fun exportTranslation(@PathVariable projectId: String, @PathVariable platform: String): ResponseEntity<ByteArray> {
-        log(mRequest?.remoteAddr, "/exportTranslation/$projectId/$platform")
-        if (platform == "android") {
-            return exportAndroid(projectId)
-        } else {
-            return exportIOS(projectId)
+    @PostMapping("/exportTranslation2")
+    fun exportTranslation2(@RequestBody exportTranslationParam: ExportTranslationParam): ResponseEntity<ByteArray> {
+        log(mRequest?.remoteAddr, "/exportTranslation2")
+        exportTranslationParam.projectIdList.forEach {
+            print("$it  ")
         }
-
+        if (exportTranslationParam.platform == "android") {
+            return exportAndroid(exportTranslationParam)
+        } else {
+            return exportIOS(exportTranslationParam)
+        }
     }
 
-    fun exportIOS(projectId: String): ResponseEntity<ByteArray> {
-        log(mRequest?.remoteAddr, "exportIOS")
-        val languageList = mTranslationDao.getLanguageList(projectId)
-        if (languageList.isNotEmpty()) {
+//    @CrossOrigin
+//    @RequestMapping("/exportTranslation/{projectId}/{platform}")
+//    fun exportTranslation(@PathVariable projectId: String, @PathVariable platform: String): ResponseEntity<ByteArray> {
+//        log(mRequest?.remoteAddr, "/exportTranslation/$projectId/$platform")
+//        if (platform == "android") {
+//            return exportAndroid(projectId)
+//        } else {
+//            return exportIOS(projectId)
+//        }
+//
+//    }
 
+    fun exportIOS(param: ExportTranslationParam): ResponseEntity<ByteArray> {
+
+        log(mRequest?.remoteAddr, "exportIOS")
+        val mainProjectId = param.projectIdList.first()
+
+        val mainLanguageList = mTranslationDao.getLanguageList(mainProjectId)
+        val subLanguageList = mutableListOf<Language>()
+        if (param.projectIdList.size > 1) {
+            for (i in 1 until param.projectIdList.size) {
+                subLanguageList.addAll(mTranslationDao.getLanguageList(param.projectIdList[i]))
+            }
+        }
+
+
+        if (mainLanguageList.isNotEmpty()) {
             //创建zip目录
             val currentDir = System.getProperty("user.dir")
             println("当前目录：$currentDir")
@@ -211,50 +250,58 @@ class MainController {
             val languageDirList: MutableList<File> = mutableListOf()
 
             //分语言导出
-            for (language in languageList) {
-                language.languageId?.let { languageId ->
-                    val translationInLanguage: List<Translation?> = mTranslationDao.queryTranslationByLanguage(languageId, projectId)
-                    println("查询到翻译数量：${translationInLanguage.size}")
-                    translationInLanguage.let { translationList ->
-                        //创建目录
-                        val dirName = when (language.languageName) {
-                            "spa" -> "es.lproj"
-                            "fra" -> "fr.lproj"
-                            "jp" -> "ja.lproj"
-                            else -> "${language.languageName}.lproj"
-                        }
+            for (language in mainLanguageList) {
+                val translationInLanguage = mutableListOf<Translation>()
+                val mainTranslationList: List<Translation> = mTranslationDao.queryTranslationByLanguage(language.languageId ?: 0, language.projectId ?: "")
+                mainTranslationList.forEach { translationInLanguage.add(it) }
 
-                        val languageDir = File("$cacheDir/$dirName")
-                        if (!languageDir.exists()) {
-                            val success = languageDir.mkdirs()
-                            println("创建目录$languageDir $success")
-                        }
-                        languageDirList.add(languageDir)
+                subLanguageList.forEach { subLanguage ->
+                    if (subLanguage.languageName == language.languageName) {
+                        val subTranslationList = mTranslationDao.queryTranslationByLanguage(subLanguage.languageId ?: 0, subLanguage.projectId ?: "")
+                        subTranslationList.forEach { translationInLanguage.add(it) }
+                    }
+                }
 
+                println("查询到翻译数量：${translationInLanguage.size}")
+                translationInLanguage.let { translationList ->
+                    //创建目录
+                    val dirName = when (language.languageName) {
+                        "spa" -> "es.lproj"
+                        "fra" -> "fr.lproj"
+                        "jp" -> "ja.lproj"
+                        else -> "${language.languageName}.lproj"
+                    }
 
-                        val file = File(languageDir, "Localizable.strings")
-                        file.createNewFile()
-                        println("创建${file.absolutePath}")
-                        FileOutputStream(file).use { fos ->
-                            translationList.forEach { translation ->
-                                translation?.translationKey?.let { translationKey ->
-                                    translation.translationContent?.let { translationContent ->
-                                        if (translationContent.contains("|")) {
-                                            val contentArray = translationContent.split("|")
-                                            var i = 0
-                                            contentArray.forEach { contentItem ->
-                                                fos.write("\"$translationKey\"${i++}=\"$contentItem\"\n".toByteArray())
-                                            }
+                    val languageDir = File("$cacheDir/$dirName")
+                    if (!languageDir.exists()) {
+                        val success = languageDir.mkdirs()
+                        println("创建目录$languageDir $success")
+                    }
+                    languageDirList.add(languageDir)
 
-                                        } else {
-                                            fos.write("\"$translationKey\"=\"$translationContent\"\n".toByteArray())
+                    val file = File(languageDir, "Localizable.strings")
+                    file.createNewFile()
+                    println("创建${file.absolutePath}")
+                    FileOutputStream(file).use { fos ->
+                        translationList.forEach { translation ->
+                            translation?.translationKey?.let { translationKey ->
+                                translation.translationContent?.let { translationContent ->
+                                    if (translationContent.contains("|")) {
+                                        val contentArray = translationContent.split("|")
+                                        var i = 0
+                                        contentArray.forEach { contentItem ->
+                                            fos.write("\"$translationKey\"${i++}=\"$contentItem\"\n;".toByteArray())
                                         }
+
+                                    } else {
+                                        fos.write("\"$translationKey\"=\"$translationContent\";\n".toByteArray())
                                     }
                                 }
                             }
                         }
                     }
                 }
+
             }
 
             val fileDir = "$currentDir/files"
@@ -285,11 +332,20 @@ class MainController {
         return ResponseEntity.ok().body(ByteArray(0))
     }
 
-    fun exportAndroid(projectId: String): ResponseEntity<ByteArray> {
+    fun exportAndroid(param: ExportTranslationParam): ResponseEntity<ByteArray> {
         log(mRequest?.remoteAddr, "exportAndroid")
-        val languageList = mTranslationDao.getLanguageList(projectId)
-        if (languageList.isNotEmpty()) {
+        val mainProjectId = param.projectIdList.first()
+        val manLanguageList = mTranslationDao.getLanguageList(mainProjectId)
 
+        val subLanguageList = mutableListOf<Language>()
+        if (param.projectIdList.size > 1) {
+            for (i in 1 until param.projectIdList.size) {
+                subLanguageList.addAll(mTranslationDao.getLanguageList(param.projectIdList[i]))
+            }
+        }
+
+
+        if (manLanguageList.isNotEmpty()) {
             //创建zip目录
             val currentDir = System.getProperty("user.dir")
             println("当前目录：$currentDir")
@@ -305,66 +361,73 @@ class MainController {
             val languageDirList: MutableList<File> = mutableListOf()
 
             //分语言导出
-            for (language in languageList) {
-                language.languageId?.let { languageId ->
-                    val translationInLanguage: List<Translation?> = mTranslationDao.queryTranslationByLanguage(languageId, projectId)
-                    println("查询到翻译数量：${translationInLanguage.size}")
-                    translationInLanguage.let { translationList ->
-                        //创建目录
-                        val dirName = when (language.languageName) {
-                            "en" -> "values"
-                            "spa" -> "values-es"
-                            "fra" -> "values-fr"
-                            "jp" -> "values-ja"
-                            else -> "values-${language.languageName}"
-                        }
+            for (language in manLanguageList) {
+                val translationInLanguage = mutableListOf<Translation>()
+                val mainProjectTranslationList: List<Translation> = mTranslationDao.queryTranslationByLanguage(language.languageId ?: 0, language.projectId ?: "")
+                mainProjectTranslationList.forEach { translationInLanguage.add(it) }
+                subLanguageList.forEach { subLanguage ->
+                    if (subLanguage.languageName == language.languageName) {
+                        val subTranslationList = mTranslationDao.queryTranslationByLanguage(subLanguage.languageId ?: 0, subLanguage.projectId ?: "")
+                        subTranslationList.forEach { translationInLanguage.add(it) }
+                    }
+                }
+                println("查询到翻译数量：${translationInLanguage.size}")
+                translationInLanguage.let { translationList ->
+                    //创建目录
+                    val dirName = when (language.languageName) {
+                        "en" -> "values"
+                        "spa" -> "values-es"
+                        "fra" -> "values-fr"
+                        "jp" -> "values-ja"
+                        else -> "values-${language.languageName}"
+                    }
 
-                        val languageDir = File("$cacheDir/$dirName")
-                        if (!languageDir.exists()) {
-                            val success = languageDir.mkdirs()
-                            println("创建目录$languageDir $success")
-                        }
-                        languageDirList.add(languageDir)
+                    val languageDir = File("$cacheDir/$dirName")
+                    if (!languageDir.exists()) {
+                        val success = languageDir.mkdirs()
+                        println("创建目录$languageDir $success")
+                    }
+                    languageDirList.add(languageDir)
 
-                        //创建xml
-                        val xmlDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
-                        val resources = xmlDoc.createElement("resources")
-                        translationList.forEach { translation ->
-                            translation?.translationKey?.let { translationKey ->
-                                translation.translationContent?.let { translationContent ->
-                                    if (translationContent.contains("|")) {
-                                        val `string-array` = xmlDoc.createElement("string-array")
-                                        `string-array`.setAttribute("name", translationKey)
-                                        val contentArray = translationContent.split("|")
-                                        contentArray.forEach { contentItem ->
-                                            val item = xmlDoc.createElement("item")
-                                            item.textContent = contentItem
-                                            `string-array`.appendChild(item)
-                                        }
-                                        resources.appendChild(`string-array`)
-                                    } else {
-                                        val string = xmlDoc.createElement("string")
-                                        string.setAttribute("name", translationKey)
-                                        string.textContent = translationContent
-                                        resources.appendChild(string)
+                    //创建xml
+                    val xmlDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
+                    val resources = xmlDoc.createElement("resources")
+                    translationList.forEach { translation ->
+                        translation?.translationKey?.let { translationKey ->
+                            translation.translationContent?.let { translationContent ->
+                                if (translationContent.contains("|")) {
+                                    val `string-array` = xmlDoc.createElement("string-array")
+                                    `string-array`.setAttribute("name", translationKey)
+                                    val contentArray = translationContent.split("|")
+                                    contentArray.forEach { contentItem ->
+                                        val item = xmlDoc.createElement("item")
+                                        item.textContent = contentItem
+                                        `string-array`.appendChild(item)
                                     }
+                                    resources.appendChild(`string-array`)
+                                } else {
+                                    val string = xmlDoc.createElement("string")
+                                    string.setAttribute("name", translationKey)
+                                    string.textContent = translationContent
+                                    resources.appendChild(string)
                                 }
                             }
                         }
-                        xmlDoc.appendChild(resources)
-                        val xmlFile = File(languageDir, "strings.xml")
-                        println("创建${xmlFile.absolutePath}")
-                        val success = xmlFile.createNewFile()
-                        print("$success")
-                        val transformFactory = TransformerFactory.newInstance()
-                        val transformer = transformFactory.newTransformer()
-                        val source = DOMSource(xmlDoc)
-                        transformer.setOutputProperty(OutputKeys.INDENT, "yes")
-                        val result = StreamResult(xmlFile)
-                        transformer.transform(source, result)
-                        print("生成${xmlFile.absolutePath}")
                     }
+                    xmlDoc.appendChild(resources)
+                    val xmlFile = File(languageDir, "strings.xml")
+                    println("创建${xmlFile.absolutePath}")
+                    val success = xmlFile.createNewFile()
+                    print("$success")
+                    val transformFactory = TransformerFactory.newInstance()
+                    val transformer = transformFactory.newTransformer()
+                    val source = DOMSource(xmlDoc)
+                    transformer.setOutputProperty(OutputKeys.INDENT, "yes")
+                    val result = StreamResult(xmlFile)
+                    transformer.transform(source, result)
+                    print("生成${xmlFile.absolutePath}")
                 }
+
             }
             val fileDir = "$currentDir/files"
             File(fileDir).let { files ->
@@ -662,7 +725,7 @@ class MainController {
                             val oldLanguages = mTranslationDao.getLanguageList(targetProjectId)
                             oldLanguages.forEach { oldLanguage ->
 
-                                mTranslationDao.addLanguage2(oldLanguage.languageDes!!,oldLanguage.languageName!!, project.projectId!!)?.let { addLanguage ->
+                                mTranslationDao.addLanguage2(oldLanguage.languageDes!!, oldLanguage.languageName!!, project.projectId!!)?.let { addLanguage ->
                                     val oldTranslations = mTranslationDao.queryTranslationByLanguage(oldLanguage.languageId ?: 0, targetProjectId)
                                     println("复制语言：${addLanguage},该语言下翻译数:${oldTranslations.size}")
                                     oldTranslations.forEach { translation ->
