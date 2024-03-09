@@ -269,6 +269,8 @@ class MainController {
                         "spa" -> "es.lproj"
                         "fra" -> "fr.lproj"
                         "jp" -> "ja.lproj"
+                        "zh-CN" -> "zh-Hans.lproj"
+                        "zh-TW" -> "zh-Hant.lproj"
                         else -> "${language.languageName}.lproj"
                     }
 
@@ -286,16 +288,16 @@ class MainController {
                         translationList.forEach { translation ->
                             translation?.translationKey?.let { translationKey ->
                                 translation.translationContent?.let { translationContent ->
-                                    if (translationContent.contains("|")) {
-                                        val contentArray = translationContent.split("|")
-                                        var i = 0
-                                        contentArray.forEach { contentItem ->
-                                            fos.write("\"$translationKey\"${i++}=\"$contentItem\"\n;".toByteArray())
-                                        }
-
-                                    } else {
+//                                    if (translationContent.contains("|")) {
+//                                        val contentArray = translationContent.split("|")
+//                                        var i = 0
+//                                        contentArray.forEach { contentItem ->
+//                                            fos.write("\"$translationKey\"${i++}=\"$contentItem\"\n;".toByteArray())
+//                                        }
+//
+//                                    } else {
                                         fos.write("\"$translationKey\"=\"$translationContent\";\n".toByteArray())
-                                    }
+//                                    }
                                 }
                             }
                         }
@@ -379,6 +381,7 @@ class MainController {
                         "spa" -> "values-es"
                         "fra" -> "values-fr"
                         "jp" -> "values-ja"
+                        "zh-CN"->"values-zh"
                         else -> "values-${language.languageName}"
                     }
 
