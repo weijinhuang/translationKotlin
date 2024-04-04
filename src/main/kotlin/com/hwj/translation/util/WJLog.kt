@@ -4,5 +4,5 @@ import java.util.*
 
 
 fun log(tag: String? = "", msg: String) {
-    println("[$tag][${Date()}]: $msg")
+    println("[${Date()}][$tag]:${msg}")
 }
