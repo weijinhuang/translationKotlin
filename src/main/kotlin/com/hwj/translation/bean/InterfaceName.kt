@@ -33,3 +33,5 @@ const val ADD_MODULE = "addModule"
 
 const val DELETE_MODULE = "deleteModule"
 
+const val MERGE_TRANSLATION = "mergeTranslation"
+

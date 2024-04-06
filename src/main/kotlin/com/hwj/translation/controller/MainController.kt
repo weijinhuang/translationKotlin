@@ -146,14 +146,11 @@ class MainController {
 
             val transResult = api.getTransResult(param.q, param.from, param.to)
             println("$param->$transResult")
-            val baiduTranslationResultResponse =
-                Gson().fromJson(transResult, BaiduTranslationResult::class.java)
+            val baiduTranslationResultResponse = Gson().fromJson(transResult, BaiduTranslationResult::class.java)
 
             return if (baiduTranslationResultResponse.error_code != null) {
                 CommonResponse(
-                    -1,
-                    baiduTranslationResultResponse.error_code,
-                    null
+                    -1, baiduTranslationResultResponse.error_code, null
                 )
             } else {
                 println("baiduTranslationResultResponse:$baiduTranslationResultResponse")
@@ -164,9 +161,7 @@ class MainController {
                     errorCode = 0
                 }
                 CommonResponse(
-                    200,
-                    "",
-                    result
+                    200, "", result
                 )
             }
         } ?: CommonResponse(-1, "参数解析错误", null)
@@ -207,8 +202,7 @@ class MainController {
                 return CommonResponse(-1, "参数错误", null)
             }
             return try {
-                var deleteTranslationSuccess =
-                    mTranslationDao.deleteTranslationByLanguageId(language.projectId!!, language.languageId!!)
+                var deleteTranslationSuccess = mTranslationDao.deleteTranslationByLanguageId(language.projectId!!, language.languageId!!)
                 if (!deleteTranslationSuccess) {
                     CommonResponse(-1, "删除翻译错误", null)
                 } else {
@@ -232,11 +226,9 @@ class MainController {
                 return CommonResponse(-1, "参数错误", null)
             }
             return try {
-                var deleteTranslationSuccess =
-                    mTranslationDao.deleteTranslationByTranslationKey(
-                        deleteTranslationParam.projectId!!,
-                        deleteTranslationParam.translationKey!!
-                    )
+                var deleteTranslationSuccess = mTranslationDao.deleteTranslationByTranslationKey(
+                    deleteTranslationParam.projectId!!, deleteTranslationParam.translationKey!!
+                )
                 if (!deleteTranslationSuccess) {
                     CommonResponse(-1, "删除翻译错误", null)
                 } else {
@@ -264,15 +256,12 @@ class MainController {
                             println("参数错误:languageName为空")
                             failedList.add(language)
                         } else {
-                            val queryLanguageList =
-                                mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
+                            val queryLanguageList = mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
                             if (!queryLanguageList.isNullOrEmpty()) {
                                 println("语言已存在")
                             } else {
                                 val success = mTranslationDao.addLanguage(
-                                    language.languageDes!!,
-                                    language.languageName!!,
-                                    language.projectId!!
+                                    language.languageDes!!, language.languageName!!, language.projectId!!
                                 )
                                 if (success) {
                                     println("添加成功")
@@ -298,75 +287,70 @@ class MainController {
         val realParamJson = gson.toJson(commonParam.data)
         return gson.fromJson<List<Translation>>(realParamJson, typeToken)?.let { translationList ->
             val failedList = mutableListOf<Translation>()
-            val moduleCaches = HashMap<Int, Module>()
             return try {
-                translationList.forEach { tranlation ->
-                    tranlation.projectId?.let { projectId ->
-                        tranlation.languageId?.let { languageId ->
-                            tranlation.translationKey?.let { translationKey ->
-                                var add = tranlation.forceAdd
-                                if (!add) {
-                                    val translationDB =
-                                        mTranslationDao.queryTranslationByKeyInLanguage(
-                                            translationKey,
-                                            projectId,
-                                            languageId
-                                        )
-                                    if (translationDB.isNotEmpty()) {
-                                        add = false
-                                        if (tranlation.translationContent != translationDB[0].translationContent) {
-                                            tranlation.oldTranslationContent = translationDB[0].translationContent
+                translationList.forEach { translation ->
+                    translation.projectId?.let { projectId ->
+                        translation.languageId?.let { languageId ->
+                            translation.translationKey?.let { translationKey ->
+                                var add = translation.forceAdd
+
+                                val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(
+                                    translationKey, projectId, languageId
+                                )
+
+                                if (translationDB.isNotEmpty()) {
+                                    if (translation.forceAdd) {
+                                        var updateSuccess = mTranslationDao.updateTranslation(translation)
+                                        if (!updateSuccess) {
+                                            failedList.add(translation)
                                         }
                                     } else {
-                                        add = true
-                                    }
-                                }
-                                if (add) {
-                                    var module = moduleCaches.get(tranlation.moduleId)
-                                    if (module == null) {
-                                        var moduleDB = mTranslationDao.queryModuleById(tranlation.moduleId ?: 0, projectId)
-                                        if (moduleDB.isEmpty()) {
-                                            module = Module()
-                                            module.moduleName = ""
-                                            module.projectId = projectId
-                                            var addModuleResult =
-                                                mTranslationDao.addModule(module.moduleName, module.projectId!!)
-                                            if (!addModuleResult) {
-                                                return CommonResponse(-1, "add mudle failed", emptyList())
-                                            }
-                                        } else {
-                                            module = moduleDB[0]
-                                            moduleCaches.put(tranlation.moduleId ?: 0, module)
+                                        print(" ${translation.translationKey} 已存在")
+                                        if (translation.translationContent != translationDB[0].translationContent) {
+                                            translation.oldTranslationContent = translationDB[0].translationContent
                                         }
-                                    }
-                                    tranlation.moduleId = module.moduleId
-                                    val success = mTranslationDao.addTranslation(tranlation)
-
-                                    if (!success) {
-                                        print(" ${tranlation.translationKey} 添加失败, content:${tranlation.translationContent}")
-                                        failedList.add(tranlation)
+                                        failedList.add(translation)
                                     }
                                 } else {
-                                    if (!tranlation.oldTranslationContent.isNullOrEmpty()) {
-                                        print(" ${tranlation.translationKey} 已存在")
-                                        failedList.add(tranlation)
+                                    val module = getModule(translation, projectId) ?: return CommonResponse(-1, "添加模块失败", null)
+                                    translation.moduleId = module.moduleId
+                                    val success = mTranslationDao.addTranslation(translation)
+                                    if (!success) {
+                                        print(" ${translation.translationKey} 添加失败, content:${translation.translationContent}")
+                                        failedList.add(translation)
                                     }
                                 }
                             }
                         }
                     }
-
-                }
-                if (failedList.isNotEmpty()) {
-                    print("")
                 }
                 CommonResponse(200, "success", failedList)
             } catch (e: Exception) {
                 CommonResponse(-1, e.message, emptyList())
             }
         } ?: CommonResponse(-1, "参数解析错误", emptyList())
+    }
 
+    val moduleCaches = HashMap<Int, Module>()
 
+    fun getModule(translation: Translation, projectId: String): Module? {
+        var module = moduleCaches[translation.moduleId]
+        if (module == null) {
+            var moduleDB = mTranslationDao.queryModuleById(translation.moduleId ?: 0, projectId)
+            if (moduleDB.isEmpty()) {
+                module = Module()
+                module.moduleName = ""
+                module.projectId = projectId
+                var addModuleResult = mTranslationDao.addModule(module.moduleName, module.projectId!!)
+                if (!addModuleResult) {
+                    return null
+                }
+            } else {
+                module = moduleDB[0]
+                moduleCaches.put(translation.moduleId ?: 0, module)
+            }
+        }
+        return module
     }
 
 
@@ -411,7 +395,7 @@ class MainController {
 
 
     fun addModuleV2(commonParam: CommonParam<*>): CommonResponse<Void> {
-        return parseRealParam(commonParam, com.hwj.translation.bean.Module::class.java)?.let { module ->
+        return parseRealParam(commonParam, Module::class.java)?.let { module ->
             if (module.moduleName.isNullOrEmpty() || module.projectId.isNullOrEmpty()) {
                 return CommonResponse(-1, "參數錯誤", null)
             }
@@ -426,7 +410,7 @@ class MainController {
     }
 
     fun deleteModuleV2(commonParam: CommonParam<*>): CommonResponse<Void> {
-        return parseRealParam(commonParam, com.hwj.translation.bean.Module::class.java)?.let { module ->
+        return parseRealParam(commonParam, Module::class.java)?.let { module ->
             if (module.moduleName.isNullOrEmpty() || module.projectId.isNullOrEmpty()) {
                 return CommonResponse(-1, "參數錯誤", null)
             }
@@ -489,14 +473,11 @@ class MainController {
 
         val transResult = api.getTransResult(param.q, param.from, param.to)
         println("$param->$transResult")
-        val baiduTranslationResultResponse =
-            Gson().fromJson(transResult, BaiduTranslationResult::class.java)
+        val baiduTranslationResultResponse = Gson().fromJson(transResult, BaiduTranslationResult::class.java)
 
         return if (baiduTranslationResultResponse.error_code != null) {
             CommonResponse(
-                -1,
-                baiduTranslationResultResponse.error_code,
-                null
+                -1, baiduTranslationResultResponse.error_code, null
             )
         } else {
             println("baiduTranslationResultResponse:$baiduTranslationResultResponse")
@@ -507,9 +488,7 @@ class MainController {
                 errorCode = 0
             }
             CommonResponse(
-                200,
-                "",
-                result
+                200, "", result
             )
 
 
@@ -620,7 +599,7 @@ class MainController {
 //                                        }
 //
 //                                    } else {
-                                        fos.write("\"$translationKey\"=\"$translationContent\";\n".toByteArray())
+                                    fos.write("\"$translationKey\"=\"$translationContent\";\n".toByteArray())
 //                                    }
                                 }
                             }
@@ -705,7 +684,7 @@ class MainController {
                         "spa" -> "values-es"
                         "fra" -> "values-fr"
                         "jp" -> "values-ja"
-                        "zh-CN"->"values-zh"
+                        "zh-CN" -> "values-zh"
                         else -> "values-${language.languageName}"
                     }
 
@@ -879,8 +858,7 @@ class MainController {
             return CommonResponse(-1, "参数错误", null)
         }
         return try {
-            var deleteTranslationSuccess =
-                mTranslationDao.deleteTranslationByLanguageId(language.projectId!!, language.languageId!!)
+            var deleteTranslationSuccess = mTranslationDao.deleteTranslationByLanguageId(language.projectId!!, language.languageId!!)
             if (!deleteTranslationSuccess) {
                 CommonResponse(-1, "删除翻译错误", null)
             } else {
@@ -905,11 +883,9 @@ class MainController {
             return CommonResponse(-1, "参数错误", null)
         }
         return try {
-            var deleteTranslationSuccess =
-                mTranslationDao.deleteTranslationByTranslationKey(
-                    deleteTranslationParam.projectId!!,
-                    deleteTranslationParam.translationKey!!
-                )
+            var deleteTranslationSuccess = mTranslationDao.deleteTranslationByTranslationKey(
+                deleteTranslationParam.projectId!!, deleteTranslationParam.translationKey!!
+            )
             if (!deleteTranslationSuccess) {
                 CommonResponse(-1, "删除翻译错误", null)
             } else {
@@ -936,15 +912,12 @@ class MainController {
                         println("参数错误:languageName为空")
                         failedList.add(language)
                     } else {
-                        val queryLanguageList =
-                            mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
+                        val queryLanguageList = mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
                         if (!queryLanguageList.isNullOrEmpty()) {
                             println("语言已存在")
                         } else {
                             val success = mTranslationDao.addLanguage(
-                                language.languageDes!!,
-                                language.languageName!!,
-                                language.projectId!!
+                                language.languageDes!!, language.languageName!!, language.projectId!!
                             )
                             if (success) {
                                 println("添加成功")
@@ -974,16 +947,13 @@ class MainController {
                 println("参数错误:languageName为空")
                 CommonResponse(-1, "参数错误：languageName为空", null)
             } else {
-                val queryLanguageList =
-                    mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
+                val queryLanguageList = mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
                 if (!queryLanguageList.isNullOrEmpty()) {
                     println("语言已存在")
                     CommonResponse(-1, "语言已存在", null)
                 } else {
                     val success = mTranslationDao.addLanguage(
-                        language.languageDes!!,
-                        language.languageName!!,
-                        language.projectId!!
+                        language.languageDes!!, language.languageName!!, language.projectId!!
                     )
                     if (success) {
                         println("添加成功")
@@ -1196,12 +1166,9 @@ class MainController {
                         tranlation.translationKey?.let { translationKey ->
                             var add = tranlation.forceAdd
                             if (!add) {
-                                val translationDB =
-                                    mTranslationDao.queryTranslationByKeyInLanguage(
-                                        translationKey,
-                                        projectId,
-                                        languageId
-                                    )
+                                val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(
+                                    translationKey, projectId, languageId
+                                )
                                 if (translationDB.isNotEmpty()) {
                                     add = false
                                     if (tranlation.translationContent != translationDB[0].translationContent) {
@@ -1219,8 +1186,7 @@ class MainController {
                                         module = Module()
                                         module.moduleName = ""
                                         module.projectId = projectId
-                                        var addModuleResult =
-                                            mTranslationDao.addModule(module.moduleName, module.projectId!!)
+                                        var addModuleResult = mTranslationDao.addModule(module.moduleName, module.projectId!!)
                                         if (!addModuleResult) {
                                             return CommonResponse(-1, "add mudle failed", emptyList())
                                         }

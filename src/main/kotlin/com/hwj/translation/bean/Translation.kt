@@ -18,8 +18,9 @@ class Translation() {
 
     var forceAdd: Boolean = false
 
+    var comment: String? = null
     override fun toString(): String {
-        return "Translation(translationId=$translationId, translationKey=$translationKey, languageId=$languageId, translationContent=$translationContent, projectId=$projectId,forceAdd=$forceAdd)"
+        return "Translation(translationId=$translationId, translationKey=$translationKey, languageId=$languageId, translationContent=$translationContent, oldTranslationContent=$oldTranslationContent, projectId=$projectId, moduleId=$moduleId, forceAdd=$forceAdd, comment=$comment)"
     }
 
 
