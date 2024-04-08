@@ -209,6 +209,7 @@ class TranslationDaoImpl : TranslationDao {
                             e.printStackTrace()
                             false
                         }
+
                     }
 
                 }
@@ -279,6 +280,20 @@ class TranslationDaoImpl : TranslationDao {
         return try {
             mJdbcTemplate.update(sqlStr) {
                 it.setString(1, projectId)
+            } > 0
+
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    override fun deleteTranslationByTranslationId(translationId: Int): Boolean {
+        val sqlStr = "DELETE FROM tb_translation WHERE translationId=?"
+        println("sqlStr -> $sqlStr")
+        return try {
+            mJdbcTemplate.update(sqlStr) {
+                it.setInt(1, translationId)
             } > 0
 
         } catch (e: java.lang.Exception) {

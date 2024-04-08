@@ -4,7 +4,6 @@ import com.google.cloud.translate.Translate
 import com.google.cloud.translate.TranslateOptions
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.hwj.translation.baidu.MD5
 import com.hwj.translation.baidu.TransApi
 import com.hwj.translation.bean.*
 import com.hwj.translation.bean.param.*
@@ -17,7 +16,6 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import retrofit2.http.DELETE
 import java.io.*
 import java.util.*
 import java.util.zip.ZipEntry
@@ -116,7 +114,8 @@ class MainController {
                     println("检测到语言:$sourceLanguage")
                 }
                 return try {
-                    val translateResult = translateService.translate(realParam.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(realParam.targetLanguage))
+                    val translateResult =
+                        translateService.translate(realParam.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(realParam.targetLanguage))
                     println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
                     CommonResponse(200, "", TranslationResult().apply {
                         this.sourceLanguage = realParam.sourceLanguage
@@ -245,40 +244,43 @@ class MainController {
         val typeToken = object : TypeToken<List<Language>>() {}.type
         val toJson = gson.toJson(param.data)
         return gson.fromJson<List<Language>>(toJson, typeToken)?.let { languageList ->
-            val failedList = mutableListOf<Language>()
+            val resultList = mutableListOf<Language>()
             if (languageList.isNotEmpty()) {
                 languageList.forEach { language ->
                     try {
-                        if (language.projectId.isNullOrBlank()) {
-                            println("参数错误:projectId")
-                            failedList.add(language)
-                        } else if (language.languageName.isNullOrBlank()) {
-                            println("参数错误:languageName为空")
-                            failedList.add(language)
-                        } else {
-                            val queryLanguageList = mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
-                            if (!queryLanguageList.isNullOrEmpty()) {
-                                println("语言已存在")
-                            } else {
-                                val success = mTranslationDao.addLanguage(
-                                    language.languageDes!!, language.languageName!!, language.projectId!!
-                                )
-                                if (success) {
-                                    println("添加成功")
+                        val newLanguage = language.projectId?.let { projectId ->
+                            language.languageName?.let { languageName ->
+                                val queryLanguageList = mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
+                                if (!queryLanguageList.isNullOrEmpty()) {
+                                    println("语言已存在")
+                                    queryLanguageList[0]
                                 } else {
-                                    println("添加项目失败")
-                                    failedList.add(language)
+                                    val success = mTranslationDao.addLanguage(
+                                        language.languageDes!!, language.languageName!!, language.projectId!!
+                                    )
+                                    if (success) {
+                                        println("添加成功")
+                                        mTranslationDao.queryLanguageByLanguageName(languageName, projectId)?.get(0)
+                                    } else {
+                                        println("添加语言失败")
+                                        return CommonResponse(-1, "添加语言失败", emptyList())
+                                    }
                                 }
                             }
                         }
-                    } catch (e: java.lang.Exception) {
-                        failedList.add(language)
+                        newLanguage?.let { resultList.add(it) }
+                    } catch (e: Exception) {
+                        return CommonResponse(-1, e.message, emptyList())
                     }
                 }
+                if (resultList.size == languageList.size) {
+                    CommonResponse(200, "", resultList)
+                } else {
+                    CommonResponse(-1, "添加语言失败", resultList)
+                }
             }
-            return CommonResponse(200, "", failedList)
+            CommonResponse(200, "", resultList)
         } ?: CommonResponse(-1, "", emptyList())
-
     }
 
 
@@ -292,14 +294,10 @@ class MainController {
                     translation.projectId?.let { projectId ->
                         translation.languageId?.let { languageId ->
                             translation.translationKey?.let { translationKey ->
-                                var add = translation.forceAdd
-
-                                val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(
-                                    translationKey, projectId, languageId
-                                )
-
+                                val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(translationKey, projectId, languageId)
                                 if (translationDB.isNotEmpty()) {
                                     if (translation.forceAdd) {
+                                        translation.translationId = translationDB[0].translationId
                                         var updateSuccess = mTranslationDao.updateTranslation(translation)
                                         if (!updateSuccess) {
                                             failedList.add(translation)
@@ -308,8 +306,8 @@ class MainController {
                                         print(" ${translation.translationKey} 已存在")
                                         if (translation.translationContent != translationDB[0].translationContent) {
                                             translation.oldTranslationContent = translationDB[0].translationContent
+                                            failedList.add(translation)
                                         }
-                                        failedList.add(translation)
                                     }
                                 } else {
                                     val module = getModule(translation, projectId) ?: return CommonResponse(-1, "添加模块失败", null)
@@ -318,6 +316,8 @@ class MainController {
                                     if (!success) {
                                         print(" ${translation.translationKey} 添加失败, content:${translation.translationContent}")
                                         failedList.add(translation)
+                                    }else{
+                                        print(" ${translation.translationKey} 添加成功, content:${translation.translationContent}")
                                     }
                                 }
                             }

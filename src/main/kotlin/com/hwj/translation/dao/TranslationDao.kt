@@ -44,6 +44,8 @@ interface TranslationDao {
 
     fun deleteTranslationByProjectId(projectId:String):Boolean
 
+    fun deleteTranslationByTranslationId(translationId:Int):Boolean
+
     /**Module*/
     fun addModule(moduleName: String, projectId: String):Boolean
 
