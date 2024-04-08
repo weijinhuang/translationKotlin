@@ -29,6 +29,12 @@
             <artifactId>google-auth-library-oauth2-http</artifactId>
             <version>1.19.0</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/io.github.evanrupert/excelkt -->
+        <dependency>
+            <groupId>io.github.evanrupert</groupId>
+            <artifactId>excelkt</artifactId>
+            <version>1.0.2</version>
+        </dependency>
 
 
         <dependency>

@@ -70,7 +70,7 @@ class TranslationDaoImpl : TranslationDao {
     /**-------Language---------*/
     override fun getLanguageList(projectId: String): List<Language> {
         val sqlStr = "SELECT * FROM tb_language WHERE projectId=?"
-        println("sqlStr -> $sqlStr")
+        println("sqlStr -> $sqlStr $projectId")
         val languageList = mJdbcTemplate.query(sqlStr, PreparedStatementSetter { it.setString(1, projectId) }, BeanPropertyRowMapper(Language::class.java))
         return languageList
     }

@@ -10,6 +10,7 @@ import com.hwj.translation.bean.param.*
 import com.hwj.translation.dao.TranslationDaoImpl
 import com.hwj.translation.print
 import com.hwj.translation.util.log
+import io.github.evanrupert.excelkt.workbook
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpHeaders
@@ -70,7 +71,7 @@ class MainController {
     @CrossOrigin
     @RequestMapping("/translationSystem")
     fun <PARAM, RESPONSE> mainEntrance(@RequestBody param: CommonParam<PARAM>): CommonResponse<RESPONSE?> {
-        println("==========V2 Request ${param.cmd} ${Date()}==========")
+        println("====V2 Request ${param.cmd} ${Date()}")
         val commonResponse = when (param.cmd) {
             GET_ALL_PROJECTS -> getProjectsV2()
             GET_ALL_TRANSLATION -> getTranslationListV2(param)
@@ -90,7 +91,7 @@ class MainController {
             null -> CommonResponse(code = -1, msg = "接口名为空", null)
             else -> CommonResponse(code = 400, msg = "未知接口${param.cmd}", null)
         }
-        println("----------V2 Request${param.cmd} ${Date()}----------")
+        println("----V2 Request${param.cmd} ${Date()}\n\n\n")
         return commonResponse as CommonResponse<RESPONSE?>
     }
 
@@ -316,7 +317,7 @@ class MainController {
                                     if (!success) {
                                         print(" ${translation.translationKey} 添加失败, content:${translation.translationContent}")
                                         failedList.add(translation)
-                                    }else{
+                                    } else {
                                         print(" ${translation.translationKey} 添加成功, content:${translation.translationContent}")
                                     }
                                 }
@@ -519,9 +520,112 @@ class MainController {
         }
         if (exportTranslationParam.platform == "android") {
             return exportAndroid(exportTranslationParam)
-        } else {
+        } else if (exportTranslationParam.platform == "ios") {
             return exportIOS(exportTranslationParam)
+        } else {
+            return exportExcel(exportTranslationParam)
         }
+    }
+
+    fun exportExcel(param: ExportTranslationParam): ResponseEntity<ByteArray> {
+        log(mRequest?.remoteAddr, "exportExcel")
+        val mainProjectId = param.projectIdList.first()
+
+        val mainLanguageList = mTranslationDao.getLanguageList(mainProjectId)
+        val subLanguageList = mutableListOf<Language>()
+        if (param.projectIdList.size > 1) {
+            for (i in 1 until param.projectIdList.size) {
+                subLanguageList.addAll(mTranslationDao.getLanguageList(param.projectIdList[i]))
+            }
+        }
+        if (mainLanguageList.isNotEmpty()) {
+            //创建zip目录
+            val currentDir = System.getProperty("user.dir")
+            println("当前目录：$currentDir")
+            val cacheDir = File("$currentDir/cache")
+            if (cacheDir.exists()) {
+                cacheDir.listFiles()?.forEach {
+                    deleteCache(it)
+                }
+            } else {
+                cacheDir.mkdirs()
+            }
+
+
+            val keyLanguageContentMap: HashMap<String, HashMap<Int, String>> = HashMap()
+
+            //分语言导出
+            for (language in mainLanguageList) {
+                val mainTranslationList: List<Translation> = mTranslationDao.queryTranslationByLanguage(language.languageId ?: 0, language.projectId ?: "")
+                mainTranslationList.forEach { translation ->
+                    parseTranslationToMap(translation.languageId ?: 0, translation, keyLanguageContentMap)
+                }
+
+                subLanguageList.forEach { subLanguage ->
+                    if (subLanguage.languageName == language.languageName) {
+                        val subTranslationList = mTranslationDao.queryTranslationByLanguage(subLanguage.languageId ?: 0, subLanguage.projectId ?: "")
+                        subTranslationList.forEach { translation ->
+                            parseTranslationToMap(language.languageId ?: 0, translation, keyLanguageContentMap)
+                        }
+                    }
+                }
+            }
+
+            val fileDir = "$currentDir/files"
+            File(fileDir).let { files ->
+                if (files.exists()) {
+                    files.listFiles()?.forEach {
+                        deleteCache(it)
+                    }
+                } else {
+                    files.mkdirs()
+                }
+            }
+
+            workbook {
+                sheet {
+                    row {
+                        cell("Key")
+                        mainLanguageList.forEach { language ->
+                            cell("${language.languageName}(${language.languageDes})")
+                        }
+                    }
+                    keyLanguageContentMap.keys.forEach { translationKey ->
+                        row {
+                            cell(translationKey)
+                            mainLanguageList.forEach { language ->
+                                cell(keyLanguageContentMap[translationKey]?.get(language.languageId ?: 0) ?: "")
+                            }
+                        }
+                    }
+                }
+            }.write("$fileDir/$mainProjectId.xlsx")
+
+            println("合并excel完毕：$fileDir/$mainProjectId.xlsx")
+            val readBytes = File("$fileDir/$mainProjectId.xlsx").readBytes()
+            val headers = HttpHeaders()
+            headers.setContentDispositionFormData("attachment", "$mainProjectId.xlsx")
+            headers.contentType = MediaType.APPLICATION_OCTET_STREAM
+            return ResponseEntity.ok().headers(headers).contentLength(readBytes.size.toLong()).body(readBytes)
+        }
+        return ResponseEntity.ok().body(ByteArray(0))
+
+    }
+
+    private fun parseTranslationToMap(languageId: Int, translation: Translation, keyLanguageContentMap: HashMap<String, HashMap<Int, String>>) {
+
+        translation.translationKey?.let { translationKey ->
+            translation.translationContent?.let { translationContent ->
+                var languageContentMap = keyLanguageContentMap[translationKey]
+                if (null == languageContentMap) {
+                    languageContentMap = HashMap()
+                    keyLanguageContentMap[translationKey] = languageContentMap
+                }
+                languageContentMap[languageId] = translationContent
+            }
+
+        }
+
     }
 
     fun exportIOS(param: ExportTranslationParam): ResponseEntity<ByteArray> {
