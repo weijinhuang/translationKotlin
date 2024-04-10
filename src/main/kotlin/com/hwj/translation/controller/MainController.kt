@@ -88,6 +88,7 @@ class MainController {
             GET_ALL_MODULES -> getAllModulesV2(param)
             ADD_MODULE -> addModuleV2(param)
             DELETE_MODULE -> deleteModuleV2(param)
+            MERGE_TRANSLATION -> mergeTranslationV2(param)
             null -> CommonResponse(code = -1, msg = "接口名为空", null)
             else -> CommonResponse(code = 400, msg = "未知接口${param.cmd}", null)
         }
@@ -176,7 +177,8 @@ class MainController {
                 mTranslationDao.queryTranslationByModule(realParam.moduleId!!, realParam.projectId)
             }
             println("查詢到翻譯：${translationList.size}")
-            CommonResponse(200, "", translationList)
+
+            CommonResponse(200, "", translationList.filter { it.hide == 0 })
         } ?: CommonResponse(-1, "参数错误", emptyList())
     }
 
@@ -406,6 +408,49 @@ class MainController {
             }
             mTranslationDao.addModule(module.moduleName!!, module.projectId!!)
             CommonResponse(200, "", null)
+        } ?: CommonResponse(-1, "参数解析出错", null)
+
+    }
+
+    private fun mergeTranslationV2(commonParam: CommonParam<*>): CommonResponse<Void> {
+        log("合并翻译", "")
+        return parseRealParam(commonParam, MergeTranslationParam::class.java)?.let { realParam ->
+            realParam.projectId?.let { projectId ->
+                realParam.mainTranslationKey?.let { mainTranslationKey ->
+//                    val mainTranslationList = mTranslationDao.queryTranslationByKey(mainTranslationKey, projectId)
+//                    if (mainTranslationList.isNotEmpty()) {
+                    realParam.translationToBeHideKeyList?.let { deleteTranslationKeyList ->
+//                        var commentBuilder = java.lang.StringBuilder()
+                        deleteTranslationKeyList.forEach { deleteTranslationKey ->
+                            val translationToBeHideList = mTranslationDao.queryTranslationByKey(deleteTranslationKey, projectId)
+                            if (translationToBeHideList.isNotEmpty()) {
+                                translationToBeHideList.forEach { translationToBeHide ->
+                                    translationToBeHide.hide = 1
+                                    translationToBeHide.referto = mainTranslationKey
+                                    val updateTranslationResult = mTranslationDao.updateTranslation(translationToBeHide)
+                                    println("${translationToBeHide.translationKey} updateTranslationResult:$updateTranslationResult")
+                                }
+                            }
+//                                val deleteSuccess = mTranslationDao.deleteTranslationByKey(deleteTranslationKey, projectId)
+//                                log("删除翻译$deleteTranslationKey","$deleteSuccess")
+//                                if (deleteSuccess) {
+//                                    commentBuilder.append(deleteTranslationKey).append(",")
+//                                }
+
+                        }
+//                            mainTranslationList.forEach { mainTranslation ->
+//                                mainTranslation.comment = commentBuilder.toString()
+//                                mTranslationDao.updateTranslation(mainTranslation)
+//                            }
+                        CommonResponse(200, "", null)
+                    } ?: CommonResponse(-1, "没有要删除的翻译", null)
+//                    } else {
+//                        CommonResponse(-1, "未查询到主翻译", null)
+//                    }
+
+                } ?: CommonResponse(-1, "没有主翻译", null)
+            } ?: CommonResponse(-1, "项目id为空", null)
+
         } ?: CommonResponse(-1, "参数解析出错", null)
 
     }
@@ -693,7 +738,7 @@ class MainController {
                     println("创建${file.absolutePath}")
                     FileOutputStream(file).use { fos ->
                         translationList.forEach { translation ->
-                            translation?.translationKey?.let { translationKey ->
+                            translation.translationKey?.let { translationKey ->
                                 translation.translationContent?.let { translationContent ->
 //                                    if (translationContent.contains("|")) {
 //                                        val contentArray = translationContent.split("|")
@@ -703,7 +748,12 @@ class MainController {
 //                                        }
 //
 //                                    } else {
-                                    fos.write("\"$translationKey\"=\"$translationContent\";\n".toByteArray())
+                                    fos.write("\"$translationKey\"=\"$translationContent\";".toByteArray())
+                                    if (!translation.comment.isNullOrEmpty()) {
+                                        fos.write("//${translation.translationKey}=${translation.comment}\n".toByteArray())
+                                    } else {
+                                        fos.write("\n".toByteArray())
+                                    }
 //                                    }
                                 }
                             }
@@ -772,71 +822,91 @@ class MainController {
             //分语言导出
             for (language in manLanguageList) {
                 val translationInLanguage = mutableListOf<Translation>()
+                val hideTranslationList = mutableListOf<Translation>()
                 val mainProjectTranslationList: List<Translation> = mTranslationDao.queryTranslationByLanguage(language.languageId ?: 0, language.projectId ?: "")
-                mainProjectTranslationList.forEach { translationInLanguage.add(it) }
+                mainProjectTranslationList.forEach {
+                    if (it.hide == 1) {
+                        hideTranslationList.add(it)
+                    } else {
+                        translationInLanguage.add(it)
+                    }
+                }
                 subLanguageList.forEach { subLanguage ->
                     if (subLanguage.languageName == language.languageName) {
                         val subTranslationList = mTranslationDao.queryTranslationByLanguage(subLanguage.languageId ?: 0, subLanguage.projectId ?: "")
-                        subTranslationList.forEach { translationInLanguage.add(it) }
-                    }
-                }
-                println("查询到翻译数量：${translationInLanguage.size}")
-                translationInLanguage.let { translationList ->
-                    //创建目录
-                    val dirName = when (language.languageName) {
-                        "en" -> "values"
-                        "spa" -> "values-es"
-                        "fra" -> "values-fr"
-                        "jp" -> "values-ja"
-                        "zh-CN" -> "values-zh"
-                        else -> "values-${language.languageName}"
-                    }
-
-                    val languageDir = File("$cacheDir/$dirName")
-                    if (!languageDir.exists()) {
-                        val success = languageDir.mkdirs()
-                        println("创建目录$languageDir $success")
-                    }
-                    languageDirList.add(languageDir)
-
-                    //创建xml
-                    val xmlDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
-                    val resources = xmlDoc.createElement("resources")
-                    translationList.forEach { translation ->
-                        translation?.translationKey?.let { translationKey ->
-                            translation.translationContent?.let { translationContent ->
-                                if (translationContent.contains("|")) {
-                                    val `string-array` = xmlDoc.createElement("string-array")
-                                    `string-array`.setAttribute("name", translationKey)
-                                    val contentArray = translationContent.split("|")
-                                    contentArray.forEach { contentItem ->
-                                        val item = xmlDoc.createElement("item")
-                                        item.textContent = contentItem
-                                        `string-array`.appendChild(item)
-                                    }
-                                    resources.appendChild(`string-array`)
-                                } else {
-                                    val string = xmlDoc.createElement("string")
-                                    string.setAttribute("name", translationKey)
-                                    string.textContent = translationContent
-                                    resources.appendChild(string)
-                                }
+                        subTranslationList.forEach {
+                            if (it.hide == 1) {
+                                hideTranslationList.add(it)
+                            } else {
+                                translationInLanguage.add(it)
                             }
                         }
                     }
-                    xmlDoc.appendChild(resources)
-                    val xmlFile = File(languageDir, "strings.xml")
-                    println("创建${xmlFile.absolutePath}")
-                    val success = xmlFile.createNewFile()
-                    print("$success")
-                    val transformFactory = TransformerFactory.newInstance()
-                    val transformer = transformFactory.newTransformer()
-                    val source = DOMSource(xmlDoc)
-                    transformer.setOutputProperty(OutputKeys.INDENT, "yes")
-                    val result = StreamResult(xmlFile)
-                    transformer.transform(source, result)
-                    print("生成${xmlFile.absolutePath}")
                 }
+                println("查询到翻译数量：${translationInLanguage.size}")
+                //创建目录
+                val dirName = when (language.languageName) {
+                    "en" -> "values"
+                    "spa" -> "values-es"
+                    "fra" -> "values-fr"
+                    "jp" -> "values-ja"
+                    "zh-CN" -> "values-zh"
+                    else -> "values-${language.languageName}"
+                }
+
+                val languageDir = File("$cacheDir/$dirName")
+                if (!languageDir.exists()) {
+                    val success = languageDir.mkdirs()
+                    println("创建目录$languageDir $success")
+                }
+                languageDirList.add(languageDir)
+
+                //创建xml
+                val xmlDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
+                val resources = xmlDoc.createElement("resources")
+                translationInLanguage.forEach { translation ->
+                    translation.translationKey?.let { translationKey ->
+                        translation.translationContent?.let { translationContent ->
+                            if (translationContent.contains("|")) {
+                                val `string-array` = xmlDoc.createElement("string-array")
+                                `string-array`.setAttribute("name", translationKey)
+                                val contentArray = translationContent.split("|")
+                                contentArray.forEach { contentItem ->
+                                    val item = xmlDoc.createElement("item")
+                                    item.textContent = contentItem
+                                    `string-array`.appendChild(item)
+                                }
+                                resources.appendChild(`string-array`)
+                            } else {
+                                val stringElement = xmlDoc.createElement("string")
+                                stringElement.setAttribute("name", translationKey)
+                                stringElement.textContent = translationContent
+                                resources.appendChild(stringElement)
+
+                            }
+                            if (!translation.comment.isNullOrEmpty()) {
+                                val createComment = xmlDoc.createComment("${translation.translationKey}=${translation.comment}")
+                                resources.appendChild(createComment)
+                            }
+                        }
+                    }
+                }
+                hideTranslationList.forEach { hideTranslation ->
+                    val createComment = xmlDoc.createComment("【${hideTranslation.referto}】 ${hideTranslation.translationKey} = ${hideTranslation.translationContent}")
+                    resources.appendChild(createComment)
+                }
+                xmlDoc.appendChild(resources)
+                val xmlFile = File(languageDir, "strings.xml")
+                println("创建${xmlFile.absolutePath}")
+                val success = xmlFile.createNewFile()
+                print("$success")
+                val transformFactory = TransformerFactory.newInstance()
+                val transformer = transformFactory.newTransformer()
+                val source = DOMSource(xmlDoc)
+                transformer.setOutputProperty(OutputKeys.INDENT, "yes")
+                val result = StreamResult(xmlFile)
+                transformer.transform(source, result)
+                print("生成${xmlFile.absolutePath}")
 
             }
             val fileDir = "$currentDir/files"
