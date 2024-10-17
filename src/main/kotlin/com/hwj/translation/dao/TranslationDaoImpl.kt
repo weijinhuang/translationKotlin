@@ -213,7 +213,7 @@ class TranslationDaoImpl : TranslationDao {
                     translation.languageId?.let { languageId ->
                         val moduleId = translation.moduleId ?: -1
 
-                        val sqlStr2 = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES(?,?,?,?,?)"
+                        val sqlStr2 = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId,comment,referto, hide) VALUES(?,?,?,?,?,?,?,?)"
                         try {
                             mJdbcTemplate.update(
                                 sqlStr2
@@ -223,6 +223,9 @@ class TranslationDaoImpl : TranslationDao {
                                 it.setString(3, translation.translationContent?.trim())
                                 it.setString(4, projectId)
                                 it.setInt(5, moduleId)
+                                it.setString(6,translation.comment?:"")
+                                it.setString(7,translation.referto?:"")
+                                it.setInt(8,translation.hide?:0)
                             } > 0
                         } catch (e: Exception) {
                             print("Key:$key -> ${translation.translationContent}")
