@@ -20,6 +20,9 @@ import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import java.io.*
 import java.nio.Buffer
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -37,7 +40,7 @@ class MainController {
     val gson = Gson()
 
     val proxyHost = "127.0.0.1"
-    val proxyPort = "7890"
+    val proxyPort = "7897"
 
     @Autowired
     private lateinit var mTranslationDao: TranslationDaoImpl
@@ -55,6 +58,12 @@ class MainController {
 //        }
         val translate: Translate = TranslateOptions.getDefaultInstance().service
 
+    }
+
+    @CrossOrigin
+    @RequestMapping("testm3u8")
+    fun testM3U8():ResponseEntity<String>{
+        return ResponseEntity.ok("http://172.16.21.156/test.m3u8")
     }
 
     @CrossOrigin
@@ -85,6 +94,7 @@ class MainController {
             DELETE_LANGUAGE -> deleteLanguageV2(param)
             DELETE_TRANSLATION_BY_KEY -> deleteTranslationByTranslationKeyV2(param)
             ADD_LANGUAGE -> addLanguagesV2(param)
+            UPDATE_LANGUAGE -> updateLanguageV2(param)
             DELETE_PROJECT -> deleteProjectV2(param)
             ADD_PROJECT -> addProjectV2(param)
             ADD_TRANSLATION -> addTranslationsV2(param)
@@ -210,16 +220,16 @@ class MainController {
             }
             return try {
                 var deleteTranslationSuccess = mTranslationDao.deleteTranslationByLanguageId(language.projectId!!, language.languageId!!)
-                if (!deleteTranslationSuccess) {
-                    CommonResponse(-1, "删除翻译错误", null)
+//                if (!deleteTranslationSuccess) {
+//                    CommonResponse(-1, "删除翻译错误", null)
+//                } else {
+                var deleteLanguageSuccess = mTranslationDao.deleteLanguage(language.languageId!!)
+                if (!deleteLanguageSuccess) {
+                    CommonResponse(-1, "删除语言错误", null)
                 } else {
-                    var deleteLanguageSuccess = mTranslationDao.deleteLanguage(language.languageId!!)
-                    if (!deleteLanguageSuccess) {
-                        CommonResponse(-1, "删除语言错误", null)
-                    } else {
-                        CommonResponse(200, "删除语言成功", null)
-                    }
+                    CommonResponse(200, "删除语言成功", null)
                 }
+//                }
             } catch (e: Exception) {
                 e.printStackTrace()
                 CommonResponse(-1, e.message, null)
@@ -246,6 +256,34 @@ class MainController {
             }
         } ?: CommonResponse(-1, "参数错误", null)
 
+    }
+
+    private fun updateLanguageV2(param: CommonParam<*>): CommonResponse<List<Language>> {
+        val typeToken = object : TypeToken<List<Language>>() {}.type
+        val toJson = gson.toJson(param.data)
+        return gson.fromJson<List<Language>>(toJson, typeToken)?.let { languageList ->
+            val resultList = mutableListOf<Language>()
+            if (languageList.isNotEmpty()) {
+                languageList.forEach { language ->
+                    try {
+                        language.languageId?.let { languageId ->
+                            language.languageName?.let { languageName ->
+                                val updateLanguageSuccess = mTranslationDao.updateLanguage2(languageId, languageName, language.languageDes ?: "", language.languageOrder ?: 0)
+                                if (updateLanguageSuccess) {
+                                    resultList.add(language)
+                                }
+                                Unit
+                            }
+                        }
+                    } catch (e: Exception) {
+                        return CommonResponse(-1, e.message, emptyList())
+                    }
+                }
+                CommonResponse(200, "", resultList)
+            } else {
+                CommonResponse(200, "", resultList)
+            }
+        } ?: CommonResponse(-1, "", emptyList())
     }
 
     fun addLanguagesV2(param: CommonParam<*>): CommonResponse<List<Language>> {
@@ -575,7 +613,24 @@ class MainController {
     }
 
     @PostMapping("/upload")
-    fun handleFileUpload(@RequestParam("file") file: MultipartFile) {
+    fun handleFileUpload(@RequestParam("Filedata") file: MultipartFile): CommonResponse<String> {
+        println("接受文件：${file.originalFilename}，大小：${file.bytes.size}")
+        try {
+            val uploadFileDir = File("uploads/")
+            if (!uploadFileDir.exists()) {
+                uploadFileDir.mkdirs()
+            }
+            val path: Path = Paths.get("uploads/", file.originalFilename)
+            Files.write(path, file.bytes)
+            println("接受文件完畢：${path}")
+            return CommonResponse(
+                200, "", "上傳成功"
+            )
+        } catch (e: java.lang.Exception) {
+            return CommonResponse(
+                -1, "", "上傳失敗"
+            )
+        }
 
     }
 
@@ -811,7 +866,7 @@ class MainController {
                                             if (i == 0) {
                                                 mStringBuilder.append('\\')
                                                 mStringBuilder.append(c)
-                                            }else{
+                                            } else {
                                                 val preChar = charArray[i - 1]
                                                 if (preChar == '\\') {
                                                     mStringBuilder.append(c)

@@ -17,6 +17,8 @@ const val DELETE_TRANSLATION_BY_KEY = "deleteTranslationByKey"
 
 const val ADD_LANGUAGE = "addLanguages"
 
+const val UPDATE_LANGUAGE = "updateLanguages"
+
 const val DELETE_PROJECT = "deleteProject"
 
 const val ADD_PROJECT = "addProject"

@@ -141,6 +141,22 @@ class TranslationDaoImpl : TranslationDao {
         }
     }
 
+    override fun updateLanguage2(languageId: Int, languageName: String, languageDes: String, languageOrder: Int): Boolean {
+//        val sqlStr2 = "UPDATE TB_TRANSLATION SET translationContent=? ,translationKey=?  ,comment=? ,referto=?, hide=? WHERE translationId=?"
+        val sqlStr  = "UPDATE TB_LANGUAGE    SET languageName=?       ,languageDes=?     , languageOrder=?                      WHERE languageId=?"
+        println("sqlStr -> $sqlStr")
+        return try {
+            mJdbcTemplate.update(sqlStr) {
+                it.setString(1, languageName)
+                it.setString(2, languageDes)
+                it.setInt(3, languageOrder)
+                it.setInt(4, languageId)
+            } > 0
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
     /**-------Module---------*/
 
 
