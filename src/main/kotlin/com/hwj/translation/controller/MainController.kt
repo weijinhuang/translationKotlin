@@ -62,7 +62,7 @@ class MainController {
 
     @CrossOrigin
     @RequestMapping("testm3u8")
-    fun testM3U8():ResponseEntity<String>{
+    fun testM3U8(): ResponseEntity<String> {
         return ResponseEntity.ok("http://172.16.21.156/test.m3u8")
     }
 
@@ -132,7 +132,12 @@ class MainController {
                 }
                 return try {
                     val translateResult =
-                        translateService.translate(realParam.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(realParam.targetLanguage))
+                        translateService.translate(
+                            realParam.content,
+                            Translate.TranslateOption.sourceLanguage(sourceLanguage),
+                            Translate.TranslateOption.targetLanguage(realParam.targetLanguage),
+                            Translate.TranslateOption.format("text")
+                        )
                     println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
                     CommonResponse(200, "", TranslationResult().apply {
                         this.sourceLanguage = realParam.sourceLanguage
