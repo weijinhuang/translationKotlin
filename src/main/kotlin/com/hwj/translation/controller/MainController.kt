@@ -25,6 +25,10 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.io.*
 import java.lang.reflect.Type
+import java.nio.Buffer
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -39,6 +43,9 @@ import kotlin.collections.HashMap
 @RestController
 class MainController {
 
+    val proxyHost = "127.0.0.1"
+    val proxyPort = "7897"
+    
     @Autowired
     private lateinit var mTranslationDao: TranslationDaoImpl
 
@@ -58,6 +65,19 @@ class MainController {
         val translate: Translate = TranslateOptions.getDefaultInstance().service
     }
 
+    @CrossOrigin
+    @RequestMapping("testm3u8")
+    fun testM3U8(): ResponseEntity<String> {
+        return ResponseEntity.ok("http://172.16.21.156/test.m3u8")
+    }
+
+    @CrossOrigin
+    @RequestMapping("getGoogleSupportLanguage")
+    fun getGoogleSupportLanguage() {
+        System.setProperty("http.proxyHost", proxyHost);
+        System.setProperty("http.proxyPort", proxyPort);
+        System.setProperty("https.proxyHost", proxyHost);
+        System.setProperty("https.proxyPort", proxyPort);
     private fun initSystemProxy() {
         System.setProperty("http.proxyHost", "127.0.0.1");
         System.setProperty("http.proxyPort", "7890");
@@ -97,19 +117,21 @@ class MainController {
             GET_LANGUAGE_LIST -> mLanguageRepository.getLanguageListV2(param)
             DELETE_LANGUAGE -> mLanguageRepository.deleteLanguageV2(param)
             ADD_LANGUAGE -> mLanguageRepository.addLanguagesV2(param)
-
+            UPDATE_LANGUAGE -> updateLanguageV2(param)
+            
             GET_ALL_TRANSLATION -> mTranslationRepository.getTranslationListV2(param)
             DELETE_TRANSLATION_BY_KEY -> mTranslationRepository.deleteTranslationByTranslationKeyV2(param)
             ADD_TRANSLATION -> mTranslationRepository.addTranslationsV2(param)
             UPDATE_TRANSLATION -> mTranslationRepository.updateTranslationsV2(param)
-
+            MERGE_TRANSLATION -> mergeTranslationV2(param)
+            
             TRANSLATE_BY_BAIDU -> translateByBaiduV2(param)
             TRANSLATE_BY_GOOGLE -> translateByGoogleV2(param)
 
             GET_ALL_MODULES -> mModuleRepository.getAllModulesV2(param)
             ADD_MODULE -> mModuleRepository.addModuleV2(param)
             DELETE_MODULE -> mModuleRepository.deleteModuleV2(param)
-
+            
             null -> CommonResponse(code = -1, msg = "接口名为空", null)
             else -> CommonResponse(code = 400, msg = "未知接口${param.cmd}", null)
         }
@@ -122,10 +144,10 @@ class MainController {
 
 
     fun translateByGoogleV2(param: CommonParam<*>): CommonResponse<TranslationResult?> {
-        System.setProperty("http.proxyHost", "127.0.0.1");
-        System.setProperty("http.proxyPort", "7890");
-        System.setProperty("https.proxyHost", "127.0.0.1");
-        System.setProperty("https.proxyPort", "7890");
+        System.setProperty("http.proxyHost", proxyHost);
+        System.setProperty("http.proxyPort", proxyPort);
+        System.setProperty("https.proxyHost", proxyHost);
+        System.setProperty("https.proxyPort", proxyPort);
 
         return param.data?.let {
             parseRealParam(param, GoogleTranslationParam::class.java)?.let { realParam ->
@@ -138,7 +160,12 @@ class MainController {
                 }
                 return try {
                     val translateResult =
-                        translateService.translate(realParam.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(realParam.targetLanguage))
+                        translateService.translate(
+                            realParam.content,
+                            Translate.TranslateOption.sourceLanguage(sourceLanguage),
+                            Translate.TranslateOption.targetLanguage(realParam.targetLanguage),
+                            Translate.TranslateOption.format("text")
+                        )
                     println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
                     CommonResponse(200, "", TranslationResult().apply {
                         this.sourceLanguage = realParam.sourceLanguage
@@ -190,8 +217,263 @@ class MainController {
 
     }
 
+    fun getTranslationListV2(param: CommonParam<*>): CommonResponse<List<Translation>> {
+        return parseRealParam(param, GetTranslationParam::class.java)?.let { realParam ->
+            val translationList = if (null == realParam.moduleId) {
+                mTranslationDao.getAllTranslationByProjectId(realParam.projectId)
+            } else {
+                mTranslationDao.queryTranslationByModule(realParam.moduleId!!, realParam.projectId)
+            }
+            println("查詢到翻譯：${translationList.size}")
+            CommonResponse(200, "", translationList)
+        } ?: CommonResponse(-1, "参数错误", emptyList())
+    }
+
+    fun getLanguageListV2(param: CommonParam<*>): CommonResponse<List<Language>> {
+        return parseRealParam<QueryLanguageListParam>(param, QueryLanguageListParam::class.java)?.let { realParam ->
+            realParam.projectId?.let { projectId ->
+                val languageList = mTranslationDao.getLanguageList(projectId)
+                return CommonResponse(200, null, languageList)
+            } ?: CommonResponse(-1, "ProjectId为空", emptyList())
+        } ?: CommonResponse(-1, "ProjectId为空", emptyList())
+    }
+
+    fun getProjectsV2(): CommonResponse<List<Project>> {
+        val projectList = mTranslationDao.getAllProject()
+        log(mRequest?.remoteAddr, "projectList -> ${projectList.size}")
+        return CommonResponse(200, null, projectList)
+    }
 
 
+    fun deleteLanguageV2(param: CommonParam<*>): CommonResponse<Void> {
+        return parseRealParam(param, Language::class.java)?.let { language ->
+            if (language.languageId == null || language.projectId.isNullOrBlank()) {
+                return CommonResponse(-1, "参数错误", null)
+            }
+            return try {
+                var deleteTranslationSuccess = mTranslationDao.deleteTranslationByLanguageId(language.projectId!!, language.languageId!!)
+                if (!deleteTranslationSuccess) {
+                    CommonResponse(-1, "删除翻译错误", null)
+                } else {
+                    var deleteLanguageSuccess = mTranslationDao.deleteLanguage(language.languageId!!)
+                    if (!deleteLanguageSuccess) {
+                        CommonResponse(-1, "删除语言错误", null)
+                    } else {
+                        CommonResponse(200, "删除语言成功", null)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                CommonResponse(-1, e.message, null)
+            }
+        } ?: CommonResponse(-1, "参数错误", null)
+    }
+
+    fun deleteTranslationByTranslationKeyV2(param: CommonParam<*>): CommonResponse<Void> {
+        return parseRealParam(param, DeleteTranslationParam::class.java)?.let { deleteTranslationParam ->
+            if (deleteTranslationParam.translationKey.isNullOrBlank() || deleteTranslationParam.projectId.isNullOrBlank()) {
+                return CommonResponse(-1, "参数错误", null)
+            }
+            return try {
+                var deleteTranslationSuccess = mTranslationDao.deleteTranslationByTranslationKey(
+                    deleteTranslationParam.projectId!!, deleteTranslationParam.translationKey!!
+                )
+                if (!deleteTranslationSuccess) {
+                    CommonResponse(-1, "删除翻译错误", null)
+                } else {
+                    CommonResponse(200, "删除翻译成功", null)
+                }
+            } catch (e: Exception) {
+                CommonResponse(-1, e.message, null)
+            }
+        } ?: CommonResponse(-1, "参数错误", null)
+
+    }
+
+    fun addLanguagesV2(param: CommonParam<*>): CommonResponse<List<Language>> {
+        val typeToken = object : TypeToken<List<Language>>() {}.type
+        val toJson = gson.toJson(param.data)
+        return gson.fromJson<List<Language>>(toJson, typeToken)?.let { languageList ->
+            val resultList = mutableListOf<Language>()
+            if (languageList.isNotEmpty()) {
+                languageList.forEach { language ->
+                    try {
+                        val newLanguage = language.projectId?.let { projectId ->
+                            language.languageName?.let { languageName ->
+                                val queryLanguageList = mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
+                                if (!queryLanguageList.isNullOrEmpty()) {
+                                    println("语言已存在")
+                                    queryLanguageList[0]
+                                } else {
+                                    val success = mTranslationDao.addLanguage(
+                                        language.languageDes!!, language.languageName!!, language.projectId!!
+                                    )
+                                    if (success) {
+                                        println("添加成功")
+                                        mTranslationDao.queryLanguageByLanguageName(languageName, projectId)?.get(0)
+                                    } else {
+                                        println("添加语言失败")
+                                        return CommonResponse(-1, "添加语言失败", emptyList())
+                                    }
+                                }
+                            }
+                        }
+                        newLanguage?.let { resultList.add(it) }
+                    } catch (e: Exception) {
+                        return CommonResponse(-1, e.message, emptyList())
+                    }
+                }
+                if (resultList.size == languageList.size) {
+                    CommonResponse(200, "", resultList)
+                } else {
+                    CommonResponse(-1, "添加语言失败", resultList)
+                }
+            }
+            CommonResponse(200, "", resultList)
+        } ?: CommonResponse(-1, "", emptyList())
+    }
+
+
+    fun addTranslationsV2(commonParam: CommonParam<*>): CommonResponse<List<Translation>> {
+        val typeToken = object : TypeToken<List<Translation>>() {}.type
+        val realParamJson = gson.toJson(commonParam.data)
+        return gson.fromJson<List<Translation>>(realParamJson, typeToken)?.let { translationList ->
+            val failedList = mutableListOf<Translation>()
+            return try {
+                translationList.forEach { translation ->
+                    translation.projectId?.let { projectId ->
+                        translation.languageId?.let { languageId ->
+                            translation.translationKey?.let { translationKey ->
+                                val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(translationKey, projectId, languageId)
+                                if (translationDB.isNotEmpty()) {
+                                    if (translation.forceAdd) {
+                                        translation.translationId = translationDB[0].translationId
+                                        var updateSuccess = mTranslationDao.updateTranslation(translation)
+                                        if (!updateSuccess) {
+                                            failedList.add(translation)
+                                        }
+                                    } else {
+                                        print(" ${translation.translationKey} 已存在")
+                                        if (translation.translationContent != translationDB[0].translationContent) {
+                                            translation.oldTranslationContent = translationDB[0].translationContent
+                                            failedList.add(translation)
+                                        }
+                                    }
+                                } else {
+                                    val module = getModule(translation, projectId) ?: return CommonResponse(-1, "添加模块失败", null)
+                                    translation.moduleId = module.moduleId
+                                    val success = mTranslationDao.addTranslation(translation)
+                                    if (!success) {
+                                        print(" ${translation.translationKey} 添加失败, content:${translation.translationContent}")
+                                        failedList.add(translation)
+                                    } else {
+                                        print(" ${translation.translationKey} 添加成功, content:${translation.translationContent}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                CommonResponse(200, "success", failedList)
+            } catch (e: Exception) {
+                CommonResponse(-1, e.message, emptyList())
+            }
+        } ?: CommonResponse(-1, "参数解析错误", emptyList())
+    }
+
+    val moduleCaches = HashMap<Int, Module>()
+
+    fun getModule(translation: Translation, projectId: String): Module? {
+        var module = moduleCaches[translation.moduleId]
+        if (module == null) {
+            var moduleDB = mTranslationDao.queryModuleById(translation.moduleId ?: 0, projectId)
+            if (moduleDB.isEmpty()) {
+                module = Module()
+                module.moduleName = ""
+                module.projectId = projectId
+                var addModuleResult = mTranslationDao.addModule(module.moduleName, module.projectId!!)
+                if (!addModuleResult) {
+                    return null
+                }
+            } else {
+                module = moduleDB[0]
+                moduleCaches.put(translation.moduleId ?: 0, module)
+            }
+        }
+        return module
+    }
+
+
+    fun updateTranslationsV2(commonParam: CommonParam<*>): CommonResponse<List<Translation>> {
+        val typeToken = object : TypeToken<List<Translation>>() {}.type
+        return gson.fromJson<List<Translation>>(gson.toJson(commonParam.data), typeToken)?.let { translationList ->
+            if (translationList.isNullOrEmpty()) {
+                CommonResponse(200, "", emptyList())
+            } else {
+                val failedList = mutableListOf<Translation>()
+                try {
+                    translationList.forEach {
+                        val success = mTranslationDao.updateTranslation(it)
+                        print("更新结果：$success $it")
+                        if (!success) {
+                            failedList.add(it)
+                        }
+                    }
+                    CommonResponse(200, "", failedList)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    CommonResponse(200, e.message, failedList)
+                }
+            }
+
+        } ?: CommonResponse(-1, "解析參數錯誤", emptyList())
+
+    }
+
+    fun getAllModulesV2(commonParam: CommonParam<*>): CommonResponse<List<Module>> {
+        return parseRealParam(commonParam, String::class.java)?.let { projectId ->
+            var moduleList = mTranslationDao.getAllModules(projectId)
+            log(mRequest?.remoteAddr, "/getAllModules/$projectId -> ${moduleList.size}")
+            if (moduleList.size == 0) {
+                mTranslationDao.addModule("default", projectId)
+            }
+            moduleList = mTranslationDao.getAllModules(projectId)
+            CommonResponse(200, null, moduleList)
+        } ?: CommonResponse(-1, "解析参数出错", emptyList())
+
+    }
+
+
+    fun addModuleV2(commonParam: CommonParam<*>): CommonResponse<Void> {
+        return parseRealParam(commonParam, Module::class.java)?.let { module ->
+            if (module.moduleName.isNullOrEmpty() || module.projectId.isNullOrEmpty()) {
+                return CommonResponse(-1, "參數錯誤", null)
+            }
+            val queryModuleByName = mTranslationDao.queryModuleByName(module.moduleName!!, module.projectId!!)
+            if (queryModuleByName.isNotEmpty()) {
+                return CommonResponse(-1, "已有相同模块", null)
+            }
+            mTranslationDao.addModule(module.moduleName!!, module.projectId!!)
+            CommonResponse(200, "", null)
+        } ?: CommonResponse(-1, "参数解析出错", null)
+
+    }
+
+    fun deleteModuleV2(commonParam: CommonParam<*>): CommonResponse<Void> {
+        return parseRealParam(commonParam, Module::class.java)?.let { module ->
+            if (module.moduleName.isNullOrEmpty() || module.projectId.isNullOrEmpty()) {
+                return CommonResponse(-1, "參數錯誤", null)
+            }
+            return try {
+                mTranslationDao.deleteModule(module.moduleId!!, module.projectId!!)
+                return CommonResponse(200, "", null)
+            } catch (e: java.lang.Exception) {
+                e.printStackTrace()
+                return CommonResponse(-1, e.message, null)
+            }
+        } ?: CommonResponse(-1, "参数解析出错", null)
+
+    }
 
     /***************************************V2 Request**********************************************/
 
@@ -343,7 +625,9 @@ class MainController {
 
     }
 
+    val mStringBuilder = java.lang.StringBuilder()
     fun exportIOS(param: ExportTranslationParam): ResponseEntity<ByteArray> {
+
         log(mRequest?.remoteAddr, "exportIOS")
         val mainProjectId = param.projectIdList.first()
 
@@ -374,41 +658,55 @@ class MainController {
             //分语言导出
             for (language in mainLanguageList) {
                 val translationInLanguage = mutableListOf<Translation>()
+                val hideTranslationList = mutableListOf<Translation>()
                 val mainTranslationList: List<Translation> = mTranslationDao.queryTranslationByLanguage(language.languageId ?: 0, language.projectId ?: "")
-                mainTranslationList.forEach { translationInLanguage.add(it) }
+                mainTranslationList.forEach {
+                    if (it.hide == 1) {
+                        hideTranslationList.add(it)
+                    } else {
+                        translationInLanguage.add(it)
+                    }
+                }
 
                 subLanguageList.forEach { subLanguage ->
                     if (subLanguage.languageName == language.languageName) {
                         val subTranslationList = mTranslationDao.queryTranslationByLanguage(subLanguage.languageId ?: 0, subLanguage.projectId ?: "")
-                        subTranslationList.forEach { translationInLanguage.add(it) }
+                        subTranslationList.forEach {
+                            if (it.hide == 1) {
+                                hideTranslationList.add(it)
+                            } else {
+                                translationInLanguage.add(it)
+                            }
+                        }
                     }
                 }
 
                 println("查询到翻译数量：${translationInLanguage.size}")
-                translationInLanguage.let { translationList ->
-                    //创建目录
-                    val dirName = when (language.languageName) {
-                        "spa" -> "es.lproj"
-                        "fra" -> "fr.lproj"
-                        "jp" -> "ja.lproj"
-                        "zh-CN" -> "zh-Hans.lproj"
-                        "zh-TW" -> "zh-Hant.lproj"
-                        else -> "${language.languageName}.lproj"
-                    }
 
-                    val languageDir = File("$cacheDir/$dirName")
-                    if (!languageDir.exists()) {
-                        val success = languageDir.mkdirs()
-                        println("创建目录$languageDir $success")
-                    }
-                    languageDirList.add(languageDir)
+                //创建目录
+                val dirName = when (language.languageName) {
+                    "spa" -> "es.lproj"
+                    "fra" -> "fr.lproj"
+                    "jp" -> "ja.lproj"
+                    "zh-CN" -> "zh-Hans.lproj"
+                    "zh-TW" -> "zh-Hant.lproj"
+                    else -> "${language.languageName}.lproj"
+                }
 
-                    val file = File(languageDir, "Localizable.strings")
-                    file.createNewFile()
-                    println("创建${file.absolutePath}")
-                    FileOutputStream(file).use { fos ->
+                val languageDir = File("$cacheDir/$dirName")
+                if (!languageDir.exists()) {
+                    val success = languageDir.mkdirs()
+                    println("创建目录$languageDir $success")
+                }
+                languageDirList.add(languageDir)
+
+                val file = File(languageDir, "Localizable.strings")
+                file.createNewFile()
+                println("创建${file.absolutePath}")
+                FileOutputStream(file).use { fos ->
+                    translationInLanguage.let { translationList ->
                         translationList.forEach { translation ->
-                            translation?.translationKey?.let { translationKey ->
+                            translation.translationKey?.let { translationKey ->
                                 translation.translationContent?.let { translationContent ->
 //                                    if (translationContent.contains("|")) {
 //                                        val contentArray = translationContent.split("|")
@@ -418,11 +716,43 @@ class MainController {
 //                                        }
 //
 //                                    } else {
-                                    fos.write("\"$translationKey\"=\"$translationContent\";\n".toByteArray())
+                                    val charArray = translationContent.toCharArray()
+                                    mStringBuilder.clear()
+
+                                    for (i in charArray.indices) {
+                                        var c = charArray[i]
+                                        if (c == '"') {
+                                            if (i == 0) {
+                                                mStringBuilder.append('\\')
+                                                mStringBuilder.append(c)
+                                            } else {
+                                                val preChar = charArray[i - 1]
+                                                if (preChar == '\\') {
+                                                    mStringBuilder.append(c)
+                                                } else {
+                                                    mStringBuilder.append('\\')
+                                                    mStringBuilder.append(c)
+                                                }
+                                            }
+                                        } else {
+                                            mStringBuilder.append(c)
+                                        }
+                                    }
+                                    fos.write("\"$translationKey\"=\"$mStringBuilder\";".toByteArray())
+                                    if (!translation.comment.isNullOrEmpty()) {
+                                        fos.write("//${translation.translationKey}=${translation.comment}\n".toByteArray())
+                                    } else {
+                                        fos.write("\n".toByteArray())
+                                    }
 //                                    }
                                 }
                             }
                         }
+                    }
+                    println("已合并翻译：${hideTranslationList.size}")
+                    hideTranslationList.forEach { hideTranslation ->
+                        val mergeTranslation = "//【${hideTranslation.referto}】 ${hideTranslation.translationKey} = ${hideTranslation.translationContent}\n"
+                        fos.write(mergeTranslation.toByteArray())
                     }
                 }
 
@@ -487,71 +817,92 @@ class MainController {
             //分语言导出
             for (language in manLanguageList) {
                 val translationInLanguage = mutableListOf<Translation>()
+                val hideTranslationList = mutableListOf<Translation>()
                 val mainProjectTranslationList: List<Translation> = mTranslationDao.queryTranslationByLanguage(language.languageId ?: 0, language.projectId ?: "")
-                mainProjectTranslationList.forEach { translationInLanguage.add(it) }
+                mainProjectTranslationList.forEach {
+                    if (it.hide == 1) {
+                        hideTranslationList.add(it)
+                    } else {
+                        translationInLanguage.add(it)
+                    }
+                }
                 subLanguageList.forEach { subLanguage ->
                     if (subLanguage.languageName == language.languageName) {
                         val subTranslationList = mTranslationDao.queryTranslationByLanguage(subLanguage.languageId ?: 0, subLanguage.projectId ?: "")
-                        subTranslationList.forEach { translationInLanguage.add(it) }
-                    }
-                }
-                println("查询到翻译数量：${translationInLanguage.size}")
-                translationInLanguage.let { translationList ->
-                    //创建目录
-                    val dirName = when (language.languageName) {
-                        "en" -> "values"
-                        "spa" -> "values-es"
-                        "fra" -> "values-fr"
-                        "jp" -> "values-ja"
-                        "zh-CN" -> "values-zh"
-                        else -> "values-${language.languageName}"
-                    }
-
-                    val languageDir = File("$cacheDir/$dirName")
-                    if (!languageDir.exists()) {
-                        val success = languageDir.mkdirs()
-                        println("创建目录$languageDir $success")
-                    }
-                    languageDirList.add(languageDir)
-
-                    //创建xml
-                    val xmlDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
-                    val resources = xmlDoc.createElement("resources")
-                    translationList.forEach { translation ->
-                        translation?.translationKey?.let { translationKey ->
-                            translation.translationContent?.let { translationContent ->
-                                if (translationContent.contains("|")) {
-                                    val `string-array` = xmlDoc.createElement("string-array")
-                                    `string-array`.setAttribute("name", translationKey)
-                                    val contentArray = translationContent.split("|")
-                                    contentArray.forEach { contentItem ->
-                                        val item = xmlDoc.createElement("item")
-                                        item.textContent = contentItem
-                                        `string-array`.appendChild(item)
-                                    }
-                                    resources.appendChild(`string-array`)
-                                } else {
-                                    val string = xmlDoc.createElement("string")
-                                    string.setAttribute("name", translationKey)
-                                    string.textContent = translationContent
-                                    resources.appendChild(string)
-                                }
+                        subTranslationList.forEach {
+                            if (it.hide == 1) {
+                                hideTranslationList.add(it)
+                            } else {
+                                translationInLanguage.add(it)
                             }
                         }
                     }
-                    xmlDoc.appendChild(resources)
-                    val xmlFile = File(languageDir, "strings.xml")
-                    println("创建${xmlFile.absolutePath}")
-                    val success = xmlFile.createNewFile()
-                    print("$success")
-                    val transformFactory = TransformerFactory.newInstance()
-                    val transformer = transformFactory.newTransformer()
-                    val source = DOMSource(xmlDoc)
-                    transformer.setOutputProperty(OutputKeys.INDENT, "yes")
-                    val result = StreamResult(xmlFile)
-                    transformer.transform(source, result)
-                    print("生成${xmlFile.absolutePath}")
                 }
+                println("查询到翻译数量：${translationInLanguage.size}")
+                //创建目录
+                val dirName = when (language.languageName) {
+                    "en" -> "values"
+                    "spa" -> "values-es"
+                    "fra" -> "values-fr"
+                    "jp" -> "values-ja"
+                    "zh-CN" -> "values-zh"
+                    else -> "values-${language.languageName}"
+                }
+
+                val languageDir = File("$cacheDir/$dirName")
+                if (!languageDir.exists()) {
+                    val success = languageDir.mkdirs()
+                    println("创建目录$languageDir $success")
+                }
+                languageDirList.add(languageDir)
+
+                //创建xml
+                val xmlDoc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
+                val resources = xmlDoc.createElement("resources")
+                translationInLanguage.forEach { translation ->
+                    translation.translationKey?.let { translationKey ->
+                        translation.translationContent?.let { translationContent ->
+                            if (translationContent.contains("|")) {
+                                val `string-array` = xmlDoc.createElement("string-array")
+                                `string-array`.setAttribute("name", translationKey)
+                                val contentArray = translationContent.split("|")
+                                contentArray.forEach { contentItem ->
+                                    val item = xmlDoc.createElement("item")
+                                    item.textContent = contentItem
+                                    `string-array`.appendChild(item)
+                                }
+                                resources.appendChild(`string-array`)
+                            } else {
+                                val stringElement = xmlDoc.createElement("string")
+                                stringElement.setAttribute("name", translationKey)
+                                stringElement.textContent = translationContent
+//                                stringElement.textContent = translationContent
+                                resources.appendChild(stringElement)
+
+                            }
+                            if (!translation.comment.isNullOrEmpty()) {
+                                val createComment = xmlDoc.createComment("${translation.translationKey}=${translation.comment}")
+                                resources.appendChild(createComment)
+                            }
+                        }
+                    }
+                }
+                hideTranslationList.forEach { hideTranslation ->
+                    val createComment = xmlDoc.createComment("【${hideTranslation.referto}】 ${hideTranslation.translationKey} = ${hideTranslation.translationContent}")
+                    resources.appendChild(createComment)
+                }
+                xmlDoc.appendChild(resources)
+                val xmlFile = File(languageDir, "strings.xml")
+                println("创建${xmlFile.absolutePath}")
+                val success = xmlFile.createNewFile()
+                print("$success")
+                val transformFactory = TransformerFactory.newInstance()
+                val transformer = transformFactory.newTransformer()
+                val source = DOMSource(xmlDoc)
+                transformer.setOutputProperty(OutputKeys.INDENT, "yes")
+                val result = StreamResult(xmlFile)
+                transformer.transform(source, result)
+                print("生成${xmlFile.absolutePath}")
 
             }
             val fileDir = "$currentDir/files"

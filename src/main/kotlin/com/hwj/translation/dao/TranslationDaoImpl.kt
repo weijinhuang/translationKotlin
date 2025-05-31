@@ -141,12 +141,37 @@ class TranslationDaoImpl : TranslationDao {
         }
     }
 
+    override fun updateLanguage2(languageId: Int, languageName: String, languageDes: String, languageOrder: Int): Boolean {
+//        val sqlStr2 = "UPDATE TB_TRANSLATION SET translationContent=? ,translationKey=?  ,comment=? ,referto=?, hide=? WHERE translationId=?"
+        val sqlStr  = "UPDATE TB_LANGUAGE    SET languageName=?       ,languageDes=?     , languageOrder=?                      WHERE languageId=?"
+        println("sqlStr -> $sqlStr")
+        return try {
+            mJdbcTemplate.update(sqlStr) {
+                it.setString(1, languageName)
+                it.setString(2, languageDes)
+                it.setInt(3, languageOrder)
+                it.setInt(4, languageId)
+            } > 0
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
     /**-------Module---------*/
 
 
     /**-------Translation---------*/
     override fun queryTranslationByLanguage(languageId: Int, projectId: String): List<Translation> {
-        val sqlStr = "SELECT * FROM tb_translation WHERE projectId=? AND languageId=?"
+        val sqlStr = "SELECT * FROM tb_translation WHERE projectId=? AND languageId=? "
+        println("sqlStr -> $sqlStr")
+        return mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
+            it.setString(1, projectId)
+            it.setInt(2, languageId)
+        }, BeanPropertyRowMapper(Translation::class.java))
+    }
+
+    override fun queryTranslationByLanguageWithHide(languageId: Int, projectId: String): List<Translation> {
+        val sqlStr = "SELECT * FROM tb_translation WHERE projectId=? AND languageId=? "
         println("sqlStr -> $sqlStr")
         return mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
             it.setString(1, projectId)
@@ -166,6 +191,17 @@ class TranslationDaoImpl : TranslationDao {
         return mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
             it.setInt(1, moduleId)
             it.setString(2, projectId)
+        }, BeanPropertyRowMapper(Translation::class.java))
+    }
+
+    override fun queryTranslationByKey(key: String, projectId: String): List<Translation> {
+        val sqlStr =
+            "SELECT * FROM tb_translation WHERE translationKey=? AND projectId=?"
+//        println("sqlStr -> $sqlStr")
+        return mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
+            it.setString(1, key)
+            it.setString(2, projectId)
+
         }, BeanPropertyRowMapper(Translation::class.java))
     }
 
@@ -193,7 +229,7 @@ class TranslationDaoImpl : TranslationDao {
                     translation.languageId?.let { languageId ->
                         val moduleId = translation.moduleId ?: -1
 
-                        val sqlStr2 = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId) VALUES(?,?,?,?,?)"
+                        val sqlStr2 = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId,comment,referto, hide) VALUES(?,?,?,?,?,?,?,?)"
                         try {
                             mJdbcTemplate.update(
                                 sqlStr2
@@ -203,6 +239,9 @@ class TranslationDaoImpl : TranslationDao {
                                 it.setString(3, translation.translationContent?.trim())
                                 it.setString(4, projectId)
                                 it.setInt(5, moduleId)
+                                it.setString(6,translation.comment?:"")
+                                it.setString(7,translation.referto?:"")
+                                it.setInt(8,translation.hide?:0)
                             } > 0
                         } catch (e: Exception) {
                             print("Key:$key -> ${translation.translationContent}")
@@ -224,13 +263,16 @@ class TranslationDaoImpl : TranslationDao {
     override fun updateTranslation(translation: Translation): Boolean {
         return translation.projectId?.let { projectId ->
             val sqlStr2 =
-                "UPDATE TB_TRANSLATION SET translationContent=? ,translationKey=? WHERE translationId=?"
+                "UPDATE TB_TRANSLATION SET translationContent=? ,translationKey=?  ,comment=? ,referto=?, hide=? WHERE translationId=?"
             mJdbcTemplate.update(
                 sqlStr2
             ) {
                 it.setString(1, translation.translationContent)
                 it.setString(2, translation.translationKey)
-                it.setInt(3, translation.translationId ?: 0)
+                it.setString(3, translation.comment)
+                it.setString(4, translation.referto ?: "")
+                it.setInt(5, translation.hide ?: 0)
+                it.setInt(6, translation.translationId ?: 0)
             } > 0
         } ?: false
 

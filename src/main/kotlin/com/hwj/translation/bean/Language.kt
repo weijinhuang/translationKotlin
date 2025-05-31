@@ -9,8 +9,10 @@ class Language {
 
     var projectId:String? = null
 
+    var languageOrder:Int? = 0
+
     override fun toString(): String {
-        return "Language(languageId=$languageId, languageName=$languageName, languageDes=$languageDes, projectId=$projectId)"
+        return "Language(languageId=$languageId, languageName=$languageName, languageDes=$languageDes, projectId=$projectId, languageOrder=$languageOrder)"
     }
 
 
