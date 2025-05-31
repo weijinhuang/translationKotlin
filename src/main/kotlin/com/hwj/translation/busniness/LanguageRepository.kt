@@ -90,4 +90,32 @@ class LanguageRepository(translationDao: TranslationDao) : BaseRepository(transl
             CommonResponse(200, "", resultList)
         } ?: CommonResponse(-1, "", emptyList())
     }
+
+    fun updateLanguageV2(param: CommonParam<*>): CommonResponse<List<Language>> {
+
+        return parseRealListPram(param,Language::class.java)?.let { languageList ->
+            val resultList = mutableListOf<Language>()
+            if (languageList.isNotEmpty()) {
+                languageList.forEach { language ->
+                    try {
+                        language.languageId?.let { languageId ->
+                            language.languageName?.let { languageName ->
+                                val updateLanguageSuccess = mTranslationDao.updateLanguage2(languageId,
+                                    languageName, language.languageDes ?: "", language.languageOrder ?: 0)
+                                if (updateLanguageSuccess) {
+                                    resultList.add(language)
+                                }
+                                Unit
+                            }
+                        }
+                    } catch (e: Exception) {
+                        return CommonResponse(-1, e.message, emptyList())
+                    }
+                }
+                CommonResponse(200, "", resultList)
+            } else {
+                CommonResponse(200, "", resultList)
+            }
+        } ?: CommonResponse(-1, "", emptyList())
+    }
 }

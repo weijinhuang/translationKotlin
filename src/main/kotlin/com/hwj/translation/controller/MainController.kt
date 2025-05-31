@@ -45,7 +45,7 @@ class MainController {
 
     val proxyHost = "127.0.0.1"
     val proxyPort = "7897"
-    
+
     @Autowired
     private lateinit var mTranslationDao: TranslationDaoImpl
 
@@ -71,18 +71,12 @@ class MainController {
         return ResponseEntity.ok("http://172.16.21.156/test.m3u8")
     }
 
-    @CrossOrigin
-    @RequestMapping("getGoogleSupportLanguage")
-    fun getGoogleSupportLanguage() {
-        System.setProperty("http.proxyHost", proxyHost);
-        System.setProperty("http.proxyPort", proxyPort);
-        System.setProperty("https.proxyHost", proxyHost);
-        System.setProperty("https.proxyPort", proxyPort);
+
     private fun initSystemProxy() {
-        System.setProperty("http.proxyHost", "127.0.0.1");
-        System.setProperty("http.proxyPort", "7890");
-        System.setProperty("https.proxyHost", "127.0.0.1");
-        System.setProperty("https.proxyPort", "7890");
+        System.setProperty("http.proxyHost", proxyHost)
+        System.setProperty("http.proxyPort", proxyPort)
+        System.setProperty("https.proxyHost", proxyHost)
+        System.setProperty("https.proxyPort", proxyPort)
     }
 
     @CrossOrigin
@@ -117,21 +111,21 @@ class MainController {
             GET_LANGUAGE_LIST -> mLanguageRepository.getLanguageListV2(param)
             DELETE_LANGUAGE -> mLanguageRepository.deleteLanguageV2(param)
             ADD_LANGUAGE -> mLanguageRepository.addLanguagesV2(param)
-            UPDATE_LANGUAGE -> updateLanguageV2(param)
-            
+            UPDATE_LANGUAGE -> mLanguageRepository.updateLanguageV2(param)
+
             GET_ALL_TRANSLATION -> mTranslationRepository.getTranslationListV2(param)
             DELETE_TRANSLATION_BY_KEY -> mTranslationRepository.deleteTranslationByTranslationKeyV2(param)
             ADD_TRANSLATION -> mTranslationRepository.addTranslationsV2(param)
             UPDATE_TRANSLATION -> mTranslationRepository.updateTranslationsV2(param)
-            MERGE_TRANSLATION -> mergeTranslationV2(param)
-            
+            MERGE_TRANSLATION -> mTranslationRepository.mergeTranslationV2(param)
+
             TRANSLATE_BY_BAIDU -> translateByBaiduV2(param)
             TRANSLATE_BY_GOOGLE -> translateByGoogleV2(param)
 
             GET_ALL_MODULES -> mModuleRepository.getAllModulesV2(param)
             ADD_MODULE -> mModuleRepository.addModuleV2(param)
             DELETE_MODULE -> mModuleRepository.deleteModuleV2(param)
-            
+
             null -> CommonResponse(code = -1, msg = "接口名为空", null)
             else -> CommonResponse(code = 400, msg = "未知接口${param.cmd}", null)
         }
@@ -290,97 +284,6 @@ class MainController {
 
     }
 
-    fun addLanguagesV2(param: CommonParam<*>): CommonResponse<List<Language>> {
-        val typeToken = object : TypeToken<List<Language>>() {}.type
-        val toJson = gson.toJson(param.data)
-        return gson.fromJson<List<Language>>(toJson, typeToken)?.let { languageList ->
-            val resultList = mutableListOf<Language>()
-            if (languageList.isNotEmpty()) {
-                languageList.forEach { language ->
-                    try {
-                        val newLanguage = language.projectId?.let { projectId ->
-                            language.languageName?.let { languageName ->
-                                val queryLanguageList = mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
-                                if (!queryLanguageList.isNullOrEmpty()) {
-                                    println("语言已存在")
-                                    queryLanguageList[0]
-                                } else {
-                                    val success = mTranslationDao.addLanguage(
-                                        language.languageDes!!, language.languageName!!, language.projectId!!
-                                    )
-                                    if (success) {
-                                        println("添加成功")
-                                        mTranslationDao.queryLanguageByLanguageName(languageName, projectId)?.get(0)
-                                    } else {
-                                        println("添加语言失败")
-                                        return CommonResponse(-1, "添加语言失败", emptyList())
-                                    }
-                                }
-                            }
-                        }
-                        newLanguage?.let { resultList.add(it) }
-                    } catch (e: Exception) {
-                        return CommonResponse(-1, e.message, emptyList())
-                    }
-                }
-                if (resultList.size == languageList.size) {
-                    CommonResponse(200, "", resultList)
-                } else {
-                    CommonResponse(-1, "添加语言失败", resultList)
-                }
-            }
-            CommonResponse(200, "", resultList)
-        } ?: CommonResponse(-1, "", emptyList())
-    }
-
-
-    fun addTranslationsV2(commonParam: CommonParam<*>): CommonResponse<List<Translation>> {
-        val typeToken = object : TypeToken<List<Translation>>() {}.type
-        val realParamJson = gson.toJson(commonParam.data)
-        return gson.fromJson<List<Translation>>(realParamJson, typeToken)?.let { translationList ->
-            val failedList = mutableListOf<Translation>()
-            return try {
-                translationList.forEach { translation ->
-                    translation.projectId?.let { projectId ->
-                        translation.languageId?.let { languageId ->
-                            translation.translationKey?.let { translationKey ->
-                                val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(translationKey, projectId, languageId)
-                                if (translationDB.isNotEmpty()) {
-                                    if (translation.forceAdd) {
-                                        translation.translationId = translationDB[0].translationId
-                                        var updateSuccess = mTranslationDao.updateTranslation(translation)
-                                        if (!updateSuccess) {
-                                            failedList.add(translation)
-                                        }
-                                    } else {
-                                        print(" ${translation.translationKey} 已存在")
-                                        if (translation.translationContent != translationDB[0].translationContent) {
-                                            translation.oldTranslationContent = translationDB[0].translationContent
-                                            failedList.add(translation)
-                                        }
-                                    }
-                                } else {
-                                    val module = getModule(translation, projectId) ?: return CommonResponse(-1, "添加模块失败", null)
-                                    translation.moduleId = module.moduleId
-                                    val success = mTranslationDao.addTranslation(translation)
-                                    if (!success) {
-                                        print(" ${translation.translationKey} 添加失败, content:${translation.translationContent}")
-                                        failedList.add(translation)
-                                    } else {
-                                        print(" ${translation.translationKey} 添加成功, content:${translation.translationContent}")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                CommonResponse(200, "success", failedList)
-            } catch (e: Exception) {
-                CommonResponse(-1, e.message, emptyList())
-            }
-        } ?: CommonResponse(-1, "参数解析错误", emptyList())
-    }
-
     val moduleCaches = HashMap<Int, Module>()
 
     fun getModule(translation: Translation, projectId: String): Module? {
@@ -401,78 +304,6 @@ class MainController {
             }
         }
         return module
-    }
-
-
-    fun updateTranslationsV2(commonParam: CommonParam<*>): CommonResponse<List<Translation>> {
-        val typeToken = object : TypeToken<List<Translation>>() {}.type
-        return gson.fromJson<List<Translation>>(gson.toJson(commonParam.data), typeToken)?.let { translationList ->
-            if (translationList.isNullOrEmpty()) {
-                CommonResponse(200, "", emptyList())
-            } else {
-                val failedList = mutableListOf<Translation>()
-                try {
-                    translationList.forEach {
-                        val success = mTranslationDao.updateTranslation(it)
-                        print("更新结果：$success $it")
-                        if (!success) {
-                            failedList.add(it)
-                        }
-                    }
-                    CommonResponse(200, "", failedList)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    CommonResponse(200, e.message, failedList)
-                }
-            }
-
-        } ?: CommonResponse(-1, "解析參數錯誤", emptyList())
-
-    }
-
-    fun getAllModulesV2(commonParam: CommonParam<*>): CommonResponse<List<Module>> {
-        return parseRealParam(commonParam, String::class.java)?.let { projectId ->
-            var moduleList = mTranslationDao.getAllModules(projectId)
-            log(mRequest?.remoteAddr, "/getAllModules/$projectId -> ${moduleList.size}")
-            if (moduleList.size == 0) {
-                mTranslationDao.addModule("default", projectId)
-            }
-            moduleList = mTranslationDao.getAllModules(projectId)
-            CommonResponse(200, null, moduleList)
-        } ?: CommonResponse(-1, "解析参数出错", emptyList())
-
-    }
-
-
-    fun addModuleV2(commonParam: CommonParam<*>): CommonResponse<Void> {
-        return parseRealParam(commonParam, Module::class.java)?.let { module ->
-            if (module.moduleName.isNullOrEmpty() || module.projectId.isNullOrEmpty()) {
-                return CommonResponse(-1, "參數錯誤", null)
-            }
-            val queryModuleByName = mTranslationDao.queryModuleByName(module.moduleName!!, module.projectId!!)
-            if (queryModuleByName.isNotEmpty()) {
-                return CommonResponse(-1, "已有相同模块", null)
-            }
-            mTranslationDao.addModule(module.moduleName!!, module.projectId!!)
-            CommonResponse(200, "", null)
-        } ?: CommonResponse(-1, "参数解析出错", null)
-
-    }
-
-    fun deleteModuleV2(commonParam: CommonParam<*>): CommonResponse<Void> {
-        return parseRealParam(commonParam, Module::class.java)?.let { module ->
-            if (module.moduleName.isNullOrEmpty() || module.projectId.isNullOrEmpty()) {
-                return CommonResponse(-1, "參數錯誤", null)
-            }
-            return try {
-                mTranslationDao.deleteModule(module.moduleId!!, module.projectId!!)
-                return CommonResponse(200, "", null)
-            } catch (e: java.lang.Exception) {
-                e.printStackTrace()
-                return CommonResponse(-1, e.message, null)
-            }
-        } ?: CommonResponse(-1, "参数解析出错", null)
-
     }
 
     /***************************************V2 Request**********************************************/

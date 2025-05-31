@@ -63,7 +63,6 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
                                 moduleId = mTranslationDao.getAllModules(project.projectId!!).first().moduleId
                                 val oldLanguages = mTranslationDao.getLanguageList(targetProjectId)
                                 oldLanguages.forEach { oldLanguage ->
-
                                     mTranslationDao.addLanguage2(oldLanguage.languageDes!!, oldLanguage.languageName!!, project.projectId!!)?.let { addLanguage ->
                                         val oldTranslations = mTranslationDao.queryTranslationByLanguage(oldLanguage.languageId ?: 0, targetProjectId)
                                         println("复制语言：${addLanguage},该语言下翻译数:${oldTranslations.size}")
@@ -72,7 +71,6 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
                                             translation.moduleId = moduleId
                                             translation.projectId = project.projectId
                                             translation.languageId = addLanguage.languageId ?: 0
-
                                             val addTranslation = mTranslationDao.addTranslation(translation)
                                             if (addTranslation) {
                                                 println("复制翻译:$translation 成功")
@@ -81,14 +79,9 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
                                             }
                                         }
                                     }
-
-
                                 }
-
                             }
-
                             CommonResponse(200, "添加成功", null)
-
                         } else {
                             println("添加项目失败")
                             CommonResponse(-1, "添加项目失败", null)
