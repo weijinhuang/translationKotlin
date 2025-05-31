@@ -1,3 +1,6 @@
 package com.hwj.translation.bean.param
 
-data class QueryLanguageListParam(val projectId: String?)
+class QueryLanguageListParam {
+    var projectId: String? = null
+}
+

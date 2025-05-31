@@ -274,6 +274,18 @@ class TranslationDaoImpl : TranslationDao {
         }
     }
 
+    override fun getTranslationCountOfLanguage(projectId: String, languageId: Int): Int {
+        val sqlStr = "SELECT COUNT(*) FROM tb_translation WHERE projectId=? AND languageId=?"
+        println("sqlStr -> $sqlStr")
+        return try {
+            mJdbcTemplate.queryForObject(sqlStr, Integer::class.java, projectId, languageId) as Int
+
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            0
+        }
+    }
+
     override fun deleteTranslationByProjectId(projectId: String): Boolean {
         val sqlStr = "DELETE FROM tb_translation WHERE projectId=?"
         println("sqlStr -> $sqlStr")

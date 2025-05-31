@@ -1,4 +1,4 @@
-package com.hwj.translation.controller
+package com.hwj.translation.net
 
 import okhttp3.Interceptor
 import okhttp3.Response

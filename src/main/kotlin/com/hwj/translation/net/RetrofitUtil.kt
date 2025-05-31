@@ -1,4 +1,4 @@
-package com.hwj.translation.controller
+package com.hwj.translation.net
 
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -12,7 +12,7 @@ object RetrofitUtil {
         .client(mOkHttpClient).addConverterFactory(GsonConverterFactory.create())
         .build()
 
-    val mTranslationApi = mRetrofit.create(TranslationApi::class.java)
+    val mTranslationApi = mRetrofit.create(BaiduTranslationApi::class.java)
 
 
 }

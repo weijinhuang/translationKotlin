@@ -1,4 +1,4 @@
-package com.hwj.translation.controller
+package com.hwj.translation.net
 
 import okhttp3.Interceptor
 import okhttp3.MediaType
@@ -17,28 +17,6 @@ class OkHttpLogger : Interceptor {
     @set:JvmName("level")
     @Volatile
     var level = Level.BODY_ONLY
-
-    /**
-     * 需要过滤的接口，此列表内的接口不打印日志
-     */
-    var requestFilterList: ArrayList<String> = arrayListOf(
-        "mp4",
-        "device/recentapprovals",
-        "common/audio/upload-file",
-        "common/device/get-device-pic"
-    )
-
-    val eventUrl = arrayListOf(
-        "device/deactivatedevice",//删除设备
-        "device/undoshareself",//积加删除分享设备
-        "device/dormancy/switch", //积加设备休眠
-        "device/deactivatedevice", //积加设备删除
-        "device/updatedevicename", //积加设备更新名字
-        "consumer/lp-device/set-device-name",//BV设备名字
-        "consumer/lp-device/break-device",//解绑BV设备
-        "consumer/lp-device/bind-share-device-with-token",//添加分享设备
-        "device/otastart"//积加设备OTA升级
-    )
 
     interface Logger {
         fun log(message: String)
@@ -76,47 +54,24 @@ class OkHttpLogger : Interceptor {
 
     constructor()
 
-    constructor(requestFilterMap: ArrayList<String>) {
-        this.requestFilterList.addAll(requestFilterMap)
-    }
-
     override fun intercept(chain: Interceptor.Chain): Response {
 
         val request = chain.request()
-        val url = request.url().toString()
-        eventUrl.forEach {
-            if (url.contains(it)) {
-                return@forEach
-            }
-        }
+        val url = request.url.toString()
 
         if (level == Level.NONE) {
             return chain.proceed(request)
         }
 
-        val pass = requestFilterList.let {
-            if (url.contains("mp4")) {
-                return@let true
-            }
-            for (e in it) {
-                if (url.contains(e)) {
-                    return@let true
-                }
-            }
-            return@let false
-        }
-        if (pass) {
-            return chain.proceed(request)
-        }
         val logTextSB = StringBuilder()
         if (level == Level.HEADERS || level == Level.BODY || level == Level.BODY_ONLY) {
-            logTextSB.append(" \n${request.method()} ${URLDecoder.decode(url, "UTF-8")}\n")
+            logTextSB.append(" \n${request.method} ${URLDecoder.decode(url, "UTF-8")}\n")
         }
         val logHeaders = level == Level.HEADERS || level == Level.BODY
         if (logHeaders) {
-            val headers = request.headers()
-            if (headers.size() > 0) {
-                for (i in 0 until headers.size()) {
+            val headers = request.headers
+            if (headers.size > 0) {
+                for (i in 0 until headers.size) {
                     logTextSB.append("Request Header:${headers.name(i)}:${headers.value(i)}\n")
                 }
             } else {
@@ -125,7 +80,7 @@ class OkHttpLogger : Interceptor {
         }
         val logBody = level == Level.BODY_ONLY || level == Level.BODY
         if (logBody) {
-            val requestBody: RequestBody? = request.body()
+            val requestBody: RequestBody? = request.body
             if (null != requestBody) {
                 val buffer = Buffer()
                 requestBody.writeTo(buffer)
@@ -138,28 +93,28 @@ class OkHttpLogger : Interceptor {
                     val bodyStr = buffer.readString(charset)
                     logTextSB.append(bodyStr)
                 } else {
-                    logTextSB.append("--> END " + request.method() + " (binary " + requestBody.contentLength() + "-byte body omitted)")
+                    logTextSB.append("--> END " + request.method + " (binary " + requestBody.contentLength() + "-byte body omitted)")
                 }
             }
         }
         logText(logTextSB.toString())
         logTextSB.clear()
         val response: Response = chain.proceed(request)
-        val responseBody = response.body()
+        val responseBody = response.body
         val contentLength = responseBody?.contentLength()
         if (level == Level.HEADERS || level == Level.BODY || level == Level.BODY_ONLY) {
             logTextSB.append(
-                " \nResponse:${response.code()} ${
-                    if (response.message().isEmpty()) "" else ' '.toString()
-                } ${response.message()} ${
+                " \nResponse:${response.code} ${
+                    if (response.message.isEmpty()) "" else ' '.toString()
+                } ${response.message} ${
                     URLDecoder.decode(
-                        response.request().url().toString(),
+                        response.request.url.toString(),
                         "UTF-8"
                     )
                 } \n"
             )
         }
-        val requestHeaders = response.headers()
+        val requestHeaders = response.headers
         val source = responseBody?.source()
 
         source?.request(Long.MAX_VALUE) // Buffer the entire body.
@@ -176,12 +131,12 @@ class OkHttpLogger : Interceptor {
             charset = contentType.charset(UTF8)
         }
         if (!isPlaintext(buffer)) {
-            logTextSB.append("<-- END HTTP (binary ${buffer?.size()} -byte body omitted)")
+            logTextSB.append("<-- END HTTP (binary ${buffer?.size} -byte body omitted)")
             logText(logTextSB.toString())
             return response
         }
         if (logHeaders) {
-            for (i in 0 until requestHeaders.size()) {
+            for (i in 0 until requestHeaders.size) {
                 logTextSB.append("Response Header:${requestHeaders.name(i)}:${requestHeaders.value(i)}\n")
             }
         }
@@ -214,7 +169,7 @@ class OkHttpLogger : Interceptor {
         return bufferArg?.let { buffer ->
             try {
                 val prefix = Buffer()
-                val byteCount = buffer.size().coerceAtMost(64)
+                val byteCount = buffer.size.coerceAtMost(64)
                 buffer.copyTo(prefix, 0, byteCount)
                 for (i in 0 until 16) {
                     if (prefix.exhausted()) {
