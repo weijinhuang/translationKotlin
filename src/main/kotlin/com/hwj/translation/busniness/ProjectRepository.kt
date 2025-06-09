@@ -9,6 +9,12 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
 
     fun getProjectsV2(): CommonResponse<List<Project>> {
         val projectList = mTranslationDao.getAllProject()
+        projectList.forEach { project: Project ->
+            project.projectId?.let { projectId ->
+                project.translationCount = mTranslationDao.getTranslationCountOfProject(projectId = projectId)
+            }
+        }
+
         return CommonResponse(200, null, projectList)
     }
 

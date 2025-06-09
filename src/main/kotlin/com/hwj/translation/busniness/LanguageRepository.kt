@@ -10,12 +10,22 @@ class LanguageRepository(translationDao: TranslationDao) : BaseRepository(transl
 
 
     fun getLanguageListV2(param: CommonParam<*>): CommonResponse<List<Language>> {
-        return parseRealParam(param, QueryLanguageListParam::class.java)?.let { realParam ->
-            realParam.projectId?.let { projectId ->
-                val languageList = mTranslationDao.getLanguageList(projectId)
-                return CommonResponse(200, null, languageList)
-            } ?: CommonResponse(-1, "ProjectId为空", emptyList())
-        } ?: CommonResponse(-1, "ProjectId为空", emptyList())
+        val languageList = mutableListOf<Language>()
+        parseRealParam(param, QueryLanguageListParam::class.java)?.let { realParam ->
+            realParam.projectIds?.forEach { projectId ->
+                val languageListOfProject = mTranslationDao.getLanguageList(projectId)
+                if (languageListOfProject.isNotEmpty()) {
+                    languageList.addAll(languageListOfProject)
+                }
+            }
+            realParam.projectId?.let { projectId->
+                val languageListOfProject = mTranslationDao.getLanguageList(projectId)
+                if(languageListOfProject.isNotEmpty()){
+                    languageList.addAll(languageListOfProject)
+                }
+            }
+        }
+        return CommonResponse(200, "", languageList)
     }
 
 
@@ -93,15 +103,17 @@ class LanguageRepository(translationDao: TranslationDao) : BaseRepository(transl
 
     fun updateLanguageV2(param: CommonParam<*>): CommonResponse<List<Language>> {
 
-        return parseRealListPram(param,Language::class.java)?.let { languageList ->
+        return parseRealListPram(param, Language::class.java)?.let { languageList ->
             val resultList = mutableListOf<Language>()
             if (languageList.isNotEmpty()) {
                 languageList.forEach { language ->
                     try {
                         language.languageId?.let { languageId ->
                             language.languageName?.let { languageName ->
-                                val updateLanguageSuccess = mTranslationDao.updateLanguage2(languageId,
-                                    languageName, language.languageDes ?: "", language.languageOrder ?: 0)
+                                val updateLanguageSuccess = mTranslationDao.updateLanguage2(
+                                    languageId,
+                                    languageName, language.languageDes ?: "", language.languageOrder ?: 0
+                                )
                                 if (updateLanguageSuccess) {
                                     resultList.add(language)
                                 }

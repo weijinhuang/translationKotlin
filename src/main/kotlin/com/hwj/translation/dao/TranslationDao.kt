@@ -45,6 +45,8 @@ interface TranslationDao {
 
     fun getTranslationCountOfLanguage(projectId: String, languageId: Int):Int
 
+    fun getTranslationCountOfProject(projectId: String):Int
+
     fun deleteTranslationByTranslationKey(projectId: String, translationKey: String): Boolean
 
     fun deleteTranslationByProjectId(projectId: String): Boolean

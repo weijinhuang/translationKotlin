@@ -6,7 +6,9 @@ class Project() {
 
     var projectName: String? = null
 
-    var copyFromProject:String? = null
+    var translationCount: Int = 0
+
+    var copyFromProject: String? = null
     override fun toString(): String {
         return "Project(package_name=$projectId, project_name=$projectName)"
     }

@@ -14,7 +14,6 @@ import com.hwj.translation.busniness.ModuleRepository
 import com.hwj.translation.busniness.ProjectRepository
 import com.hwj.translation.busniness.TranslationRepository
 import com.hwj.translation.dao.TranslationDaoImpl
-import com.hwj.translation.print
 import com.hwj.translation.util.log
 import io.github.evanrupert.excelkt.workbook
 import jakarta.servlet.http.HttpServletRequest
@@ -25,10 +24,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.io.*
 import java.lang.reflect.Type
-import java.nio.Buffer
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -37,7 +32,6 @@ import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
-import kotlin.collections.HashMap
 
 
 @RestController
@@ -102,7 +96,7 @@ class MainController {
     @CrossOrigin
     @RequestMapping("/translationSystem")
     fun <PARAM, RESPONSE> mainEntrance(@RequestBody param: CommonParam<PARAM>): CommonResponse<RESPONSE?> {
-        println("====V2 Request ${param.cmd} ${Date()} data:")
+        println("↓↓↓↓↓↓↓↓↓↓↓↓↓↓ ${param.cmd} ${Date().toLocaleString()} ")
         val commonResponse = when (param.cmd) {
             GET_ALL_PROJECTS -> mProjectRepository.getProjectsV2()
             DELETE_PROJECT -> mProjectRepository.deleteProjectV2(param)
@@ -129,7 +123,7 @@ class MainController {
             null -> CommonResponse(code = -1, msg = "接口名为空", null)
             else -> CommonResponse(code = 400, msg = "未知接口${param.cmd}", null)
         }
-        println("----V2 Request${param.cmd} ${Date()}\n\n\n")
+        println("↑↑↑↑↑↑↑↑↑↑↑↑↑ ${param.cmd} ${Date()}\n\n\n")
         return commonResponse as CommonResponse<RESPONSE?>
     }
 
@@ -138,11 +132,7 @@ class MainController {
 
 
     fun translateByGoogleV2(param: CommonParam<*>): CommonResponse<TranslationResult?> {
-        System.setProperty("http.proxyHost", proxyHost);
-        System.setProperty("http.proxyPort", proxyPort);
-        System.setProperty("https.proxyHost", proxyHost);
-        System.setProperty("https.proxyPort", proxyPort);
-
+        initSystemProxy()
         return param.data?.let {
             parseRealParam(param, GoogleTranslationParam::class.java)?.let { realParam ->
                 val translateService = TranslateOptions.getDefaultInstance().service
@@ -211,78 +201,7 @@ class MainController {
 
     }
 
-    fun getTranslationListV2(param: CommonParam<*>): CommonResponse<List<Translation>> {
-        return parseRealParam(param, GetTranslationParam::class.java)?.let { realParam ->
-            val translationList = if (null == realParam.moduleId) {
-                mTranslationDao.getAllTranslationByProjectId(realParam.projectId)
-            } else {
-                mTranslationDao.queryTranslationByModule(realParam.moduleId!!, realParam.projectId)
-            }
-            println("查詢到翻譯：${translationList.size}")
-            CommonResponse(200, "", translationList)
-        } ?: CommonResponse(-1, "参数错误", emptyList())
-    }
 
-    fun getLanguageListV2(param: CommonParam<*>): CommonResponse<List<Language>> {
-        return parseRealParam<QueryLanguageListParam>(param, QueryLanguageListParam::class.java)?.let { realParam ->
-            realParam.projectId?.let { projectId ->
-                val languageList = mTranslationDao.getLanguageList(projectId)
-                return CommonResponse(200, null, languageList)
-            } ?: CommonResponse(-1, "ProjectId为空", emptyList())
-        } ?: CommonResponse(-1, "ProjectId为空", emptyList())
-    }
-
-    fun getProjectsV2(): CommonResponse<List<Project>> {
-        val projectList = mTranslationDao.getAllProject()
-        log(mRequest?.remoteAddr, "projectList -> ${projectList.size}")
-        return CommonResponse(200, null, projectList)
-    }
-
-
-    fun deleteLanguageV2(param: CommonParam<*>): CommonResponse<Void> {
-        return parseRealParam(param, Language::class.java)?.let { language ->
-            if (language.languageId == null || language.projectId.isNullOrBlank()) {
-                return CommonResponse(-1, "参数错误", null)
-            }
-            return try {
-                var deleteTranslationSuccess = mTranslationDao.deleteTranslationByLanguageId(language.projectId!!, language.languageId!!)
-                if (!deleteTranslationSuccess) {
-                    CommonResponse(-1, "删除翻译错误", null)
-                } else {
-                    var deleteLanguageSuccess = mTranslationDao.deleteLanguage(language.languageId!!)
-                    if (!deleteLanguageSuccess) {
-                        CommonResponse(-1, "删除语言错误", null)
-                    } else {
-                        CommonResponse(200, "删除语言成功", null)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                CommonResponse(-1, e.message, null)
-            }
-        } ?: CommonResponse(-1, "参数错误", null)
-    }
-
-    fun deleteTranslationByTranslationKeyV2(param: CommonParam<*>): CommonResponse<Void> {
-        return parseRealParam(param, DeleteTranslationParam::class.java)?.let { deleteTranslationParam ->
-            if (deleteTranslationParam.translationKey.isNullOrBlank() || deleteTranslationParam.projectId.isNullOrBlank()) {
-                return CommonResponse(-1, "参数错误", null)
-            }
-            return try {
-                var deleteTranslationSuccess = mTranslationDao.deleteTranslationByTranslationKey(
-                    deleteTranslationParam.projectId!!, deleteTranslationParam.translationKey!!
-                )
-                if (!deleteTranslationSuccess) {
-                    CommonResponse(-1, "删除翻译错误", null)
-                } else {
-                    CommonResponse(200, "删除翻译成功", null)
-                }
-            } catch (e: Exception) {
-                CommonResponse(-1, e.message, null)
-            }
-        } ?: CommonResponse(-1, "参数错误", null)
-
-    }
 
     val moduleCaches = HashMap<Int, Module>()
 
