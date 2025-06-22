@@ -145,13 +145,15 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
 
     }
 
-    val moduleCaches = HashMap<Int, Module>()
+    val moduleCaches = HashMap<String, Module>()//暂时没有用，为以后增加模块扩展预留
 
     fun getModule(translation: Translation, projectId: String): Module? {
-        var module = moduleCaches[translation.moduleId]
+        var module = moduleCaches[projectId]
         if (module == null) {
-            var moduleDB = mTranslationDao.queryModuleById(translation.moduleId ?: 0, projectId)
+            println("未找到内存缓存，查找数据库")
+            var moduleDB = mTranslationDao.queryModuleById(projectId)
             if (moduleDB.isEmpty()) {
+                println("未找到数据库缓存，创建新module")
                 module = Module()
                 module.moduleName = ""
                 module.projectId = projectId
@@ -159,10 +161,20 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                 if (!addModuleResult) {
                     return null
                 }
+                val result  = mTranslationDao.queryModuleById(projectId)
+                if(result.isNotEmpty()){
+                    println("已创建module：$module")
+                    module = result[0]
+                    moduleCaches.put(projectId, module)
+
+                }
             } else {
                 module = moduleDB[0]
-                moduleCaches.put(translation.moduleId ?: 0, module)
+                println("数据库缓存：$module")
+                moduleCaches.put(projectId, module)
             }
+        }else{
+            println("内存缓存：$module")
         }
         return module
     }

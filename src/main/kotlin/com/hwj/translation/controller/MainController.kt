@@ -202,13 +202,12 @@ class MainController {
     }
 
 
-
     val moduleCaches = HashMap<Int, Module>()
 
     fun getModule(translation: Translation, projectId: String): Module? {
         var module = moduleCaches[translation.moduleId]
         if (module == null) {
-            var moduleDB = mTranslationDao.queryModuleById(translation.moduleId ?: 0, projectId)
+            var moduleDB = mTranslationDao.queryModuleById(projectId)
             if (moduleDB.isEmpty()) {
                 module = Module()
                 module.moduleName = ""
@@ -301,9 +300,14 @@ class MainController {
 
             val keyLanguageContentMap: HashMap<String, HashMap<Int, String>> = HashMap()
 
+            var sortTranslationList: MutableList<Translation>? = null
+
             //分语言导出
             for (language in mainLanguageList) {
                 val mainTranslationList: List<Translation> = mTranslationDao.queryTranslationByLanguage(language.languageId ?: 0, language.projectId ?: "")
+                if (sortTranslationList == null) {
+                    sortTranslationList = mainTranslationList.toMutableList()
+                }
                 mainTranslationList.forEach { translation ->
                     parseTranslationToMap(translation.languageId ?: 0, translation, keyLanguageContentMap)
                 }
@@ -316,6 +320,10 @@ class MainController {
                         }
                     }
                 }
+            }
+
+            sortTranslationList?.sortByDescending {
+                it.translationId
             }
 
             val fileDir = "$currentDir/files"
@@ -337,14 +345,28 @@ class MainController {
                             cell("${language.languageName}(${language.languageDes})")
                         }
                     }
-                    keyLanguageContentMap.keys.forEach { translationKey ->
-                        row {
-                            cell(translationKey)
-                            mainLanguageList.forEach { language ->
-                                cell(keyLanguageContentMap[translationKey]?.get(language.languageId ?: 0) ?: "")
+                    sortTranslationList?.let { sortTranslationList ->
+                        sortTranslationList.forEach { sortTranslation ->
+                            sortTranslation.translationKey?.let {translationKey->
+                                row {
+                                    cell(translationKey)
+                                    mainLanguageList.forEach { language ->
+                                        cell(keyLanguageContentMap[translationKey]?.get(language.languageId ?: 0) ?: "")
+                                    }
+                                }
                             }
+
                         }
+
                     }
+//                    keyLanguageContentMap.keys.forEach { translationKey ->
+//                        row {
+//                            cell(translationKey)
+//                            mainLanguageList.forEach { language ->
+//                                cell(keyLanguageContentMap[translationKey]?.get(language.languageId ?: 0) ?: "")
+//                            }
+//                        }
+//                    }
                 }
             }.write("$fileDir/$mainProjectId.xlsx")
 
@@ -732,6 +754,19 @@ class MainController {
                 }
             }
         }
+    }
+
+    @CrossOrigin
+    @RequestMapping("/sayhello")
+    fun helloWorld() {
+        log(mRequest?.remoteAddr, "sayHello")
+        val currentDir = System.getProperty("user.dir")
+        println("当前目录：$currentDir")
+        val fileDir = File("$currentDir/files")
+        deleteCache(fileDir)
+
+        deleteCache(File("$currentDir/cache"))
+
     }
 
     fun <PARAM> parseRealParam(param: CommonParam<*>, clazz: Class<PARAM>): PARAM? {
