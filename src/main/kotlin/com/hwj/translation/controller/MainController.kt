@@ -14,6 +14,7 @@ import com.hwj.translation.busniness.ModuleRepository
 import com.hwj.translation.busniness.ProjectRepository
 import com.hwj.translation.busniness.TranslationRepository
 import com.hwj.translation.dao.TranslationDaoImpl
+import com.hwj.translation.util.handleSingleQuotes
 import com.hwj.translation.util.log
 import io.github.evanrupert.excelkt.workbook
 import jakarta.servlet.http.HttpServletRequest
@@ -564,6 +565,7 @@ class MainController {
 
             val languageDirList: MutableList<File> = mutableListOf()
 
+            val addTranslationSB = java.lang.StringBuilder()
             //分语言导出
             for (language in manLanguageList) {
                 val translationInLanguage = mutableListOf<Translation>()
@@ -618,15 +620,15 @@ class MainController {
                                 val contentArray = translationContent.split("|")
                                 contentArray.forEach { contentItem ->
                                     val item = xmlDoc.createElement("item")
-                                    item.textContent = contentItem
+                                    item.textContent = handleSingleQuotes(addTranslationSB, contentItem)
                                     `string-array`.appendChild(item)
                                 }
                                 resources.appendChild(`string-array`)
                             } else {
                                 val stringElement = xmlDoc.createElement("string")
                                 stringElement.setAttribute("name", translationKey)
-                                stringElement.textContent = translationContent
-//                                stringElement.textContent = translationContent
+                                stringElement.textContent = handleSingleQuotes(addTranslationSB, translationContent)
+
                                 resources.appendChild(stringElement)
 
                             }

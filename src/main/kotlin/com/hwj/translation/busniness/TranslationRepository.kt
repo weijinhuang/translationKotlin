@@ -8,6 +8,7 @@ import com.hwj.translation.bean.param.DeleteTranslationParam
 import com.hwj.translation.bean.param.GetTranslationParam
 import com.hwj.translation.bean.param.MergeTranslationParam
 import com.hwj.translation.dao.TranslationDao
+import com.hwj.translation.util.handleSingleQuotes
 
 class TranslationRepository(translationDao: TranslationDao) : BaseRepository(translationDao) {
 
@@ -58,28 +59,7 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                         translation.languageId?.let { languageId ->
                             translation.translationKey?.let { translationKey ->
                                 translation.translationContent?.let { translationContent ->
-                                    val charArray = translationContent.toCharArray()
-                                    addTranslationSB.clear()
-                                    for (i in charArray.indices) {
-                                        var c = charArray[i]
-                                        if (c == '\'') {
-                                            if (i == 0) {
-                                                addTranslationSB.append('\\')
-                                                addTranslationSB.append(c)
-                                            } else {
-                                                val preChar = charArray[i - 1]
-                                                if (preChar == '\\') {
-                                                    addTranslationSB.append(c)
-                                                } else {
-                                                    addTranslationSB.append('\\')
-                                                    addTranslationSB.append(c)
-                                                }
-                                            }
-                                        } else {
-                                            addTranslationSB.append(c)
-                                        }
-                                    }
-                                    translation.translationContent = addTranslationSB.toString()
+                                    translation.translationContent = handleSingleQuotes(addTranslationSB,translationContent)
                                     val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(translationKey, projectId, languageId)
                                     if (translationDB.isNotEmpty()) {
                                         if (translation.forceAdd) {
