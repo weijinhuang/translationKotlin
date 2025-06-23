@@ -8,7 +8,7 @@ const RESOURCES = {"assets/AssetManifest.bin": "8640dc5db24078ca243c19ba3001d696
 "assets/AssetManifest.json": "21c95a0dfc561c31533fc11105346350",
 "assets/FontManifest.json": "192250eba0083a8d83f80c3b4360ad17",
 "assets/fonts/Corben/Corben-Bold.ttf": "8f9921f9c52d3c25fd354d6e01f7b024",
-"assets/fonts/MaterialIcons-Regular.otf": "3dd164daffbd1fa9ab6dac2786f7e5b5",
+"assets/fonts/MaterialIcons-Regular.otf": "41c1e5ad169384de82a0d5b42d1df818",
 "assets/images/baidu.png": "9e3ee8ee5b50988e710658520aa4a0b6",
 "assets/images/baidu_color.png": "72749c0c74dba60598819c35ed2be5ca",
 "assets/images/google.png": "e073e237f6e2a0a3755490220e8920ce",
@@ -29,9 +29,9 @@ const RESOURCES = {"assets/AssetManifest.bin": "8640dc5db24078ca243c19ba3001d696
 "icons/Icon-512.png": "96e752610906ba2a93c65f8abe1645f1",
 "icons/Icon-maskable-192.png": "c457ef57daa1d16f64b27b786ec2ea3c",
 "icons/Icon-maskable-512.png": "301a7604d45b3e739efc881eb04896ea",
-"index.html": "e8a0f2f4bc554757fd2b29221da8895f",
-"/": "e8a0f2f4bc554757fd2b29221da8895f",
-"main.dart.js": "fe8624e6b219a0ee1f01f86957ed0f26",
+"index.html": "e28c2f534bf6c6ab2259c991327504bd",
+"/": "e28c2f534bf6c6ab2259c991327504bd",
+"main.dart.js": "a600c7fddad995641f91cd034ae92d85",
 "manifest.json": "4fe4bb32efa94582b096affdfee541a9",
 "version.json": "dc3df30a9450c85c5fe83e3bddb97d58"};
 // The application shell files that are downloaded before a service worker can
