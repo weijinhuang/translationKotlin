@@ -429,12 +429,11 @@ class TranslationDaoImpl : TranslationDao {
         return modules
     }
 
-    override fun queryModuleById(moduleId: Int, projectId: String): List<Module> {
-        val sqlStr = "SELECT * FROM TB_FUNCTION_MODULE WHERE projectId=? AND moduleId=?"
+    override fun queryModuleById( projectId: String): List<Module> {
+        val sqlStr = "SELECT * FROM TB_FUNCTION_MODULE WHERE projectId=?"
 //        println("sqlStr -> $sqlStr")
         val modules = mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
             it.setString(1, projectId)
-            it.setInt(2, moduleId)
         }, BeanPropertyRowMapper(Module::class.java))
         return modules
     }

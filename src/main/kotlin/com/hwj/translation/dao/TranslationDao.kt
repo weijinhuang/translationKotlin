@@ -61,6 +61,6 @@ interface TranslationDao {
     fun getAllModules(projectId: String): List<com.hwj.translation.bean.Module>
 
     fun queryModuleByName(moduleName: String, projectId: String): List<com.hwj.translation.bean.Module>
-    fun queryModuleById(moduleId: Int, projectId: String): List<com.hwj.translation.bean.Module>
+    fun queryModuleById(projectId: String): List<com.hwj.translation.bean.Module>
 
 }
