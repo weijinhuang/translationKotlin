@@ -18,9 +18,9 @@ class LanguageRepository(translationDao: TranslationDao) : BaseRepository(transl
                     languageList.addAll(languageListOfProject)
                 }
             }
-            realParam.projectId?.let { projectId->
+            realParam.projectId?.let { projectId ->
                 val languageListOfProject = mTranslationDao.getLanguageList(projectId)
-                if(languageListOfProject.isNotEmpty()){
+                if (languageListOfProject.isNotEmpty()) {
                     languageList.addAll(languageListOfProject)
                 }
             }
@@ -73,12 +73,13 @@ class LanguageRepository(translationDao: TranslationDao) : BaseRepository(transl
                                     println("语言已存在")
                                     queryLanguageList[0]
                                 } else {
-                                    val success = mTranslationDao.addLanguage(
+                                    val success = mTranslationDao.addLanguage2(
                                         language.languageDes!!, language.languageName!!, language.projectId!!
                                     )
-                                    if (success) {
+                                    if (success != null) {
                                         println("添加成功")
-                                        mTranslationDao.queryLanguageByLanguageName(languageName, projectId)?.get(0)
+//                                        mTranslationDao.queryLanguageByLanguageName(languageName, projectId)?.get(0)
+                                        success
                                     } else {
                                         println("添加语言失败")
                                         return CommonResponse(-1, "添加语言失败", emptyList())

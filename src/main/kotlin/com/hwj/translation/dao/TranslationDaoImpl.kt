@@ -98,21 +98,48 @@ class TranslationDaoImpl : TranslationDao {
     override fun addLanguage2(languageDes: String, languageName: String, projectId: String): Language? {
         val sqlStr = "INSERT INTO TB_LANGUAGE(languageDes,languageName,projectId) VALUES(?,?,?)"
         println("sqlStr -> $sqlStr")
-        val success = mJdbcTemplate.update(sqlStr) {
-            it.setString(1, languageDes)
-            it.setString(2, languageName)
-            it.setString(3, projectId)
-        } > 0
-        return if (success) {
-            val queryStr = "SELECT * FROM TB_LANGUAGE WHERE projectId=? AND languageName=?"
-            val languageList = mJdbcTemplate.query(queryStr, PreparedStatementSetter {
-                it.setString(1, projectId)
-                it.setString(2, languageName)
-            }, BeanPropertyRowMapper(Language::class.java))
-            languageList.first()
-        } else {
-            null
+
+        val keyHolder = GeneratedKeyHolder()
+
+        val affectedRows = mJdbcTemplate.update({connection->
+            val ps = connection.prepareStatement(sqlStr, arrayOf("languageId"))
+            ps.setString(1, languageDes)
+            ps.setString(2, languageName)
+            ps.setString(3, projectId)
+            ps
+        }, keyHolder)
+
+        return if(affectedRows>0){
+            keyHolder.key?.let {
+                val languageId = it.toInt()
+                println("新增Language:$languageId")
+                Language().apply {
+                    this.languageId = languageId?.toInt()
+                    this.languageName = languageName
+                    this.languageDes = languageDes
+                    this.projectId = projectId
+                    this.languageOrder = 0
+                }
+            }?:null
+        }else{
+            return null
         }
+
+//        val success = mJdbcTemplate.update(sqlStr) {
+//            it.setString(1, languageDes)
+//            it.setString(2, languageName)
+//            it.setString(3, projectId)
+//        } > 0
+//        return if (success) {
+//            val queryStr = "SELECT * FROM TB_LANGUAGE WHERE projectId=? AND languageName=?"
+//            val languageList = mJdbcTemplate.query(queryStr, PreparedStatementSetter {
+//                it.setString(1, projectId)
+//                it.setString(2, languageName)
+//            }, BeanPropertyRowMapper(Language::class.java))
+//            languageList.first()
+//        } else {
+//            null
+//        }
     }
 
     override fun deleteLanguage(languageId: Int): Boolean {
@@ -376,7 +403,7 @@ class TranslationDaoImpl : TranslationDao {
             val keyHolder = GeneratedKeyHolder()
 
             val affectedRows = mJdbcTemplate.update({ connection ->
-                val ps = connection.prepareStatement(sqlStr, arrayOf("id"))
+                val ps = connection.prepareStatement(sqlStr, arrayOf("moduleId"))
                 ps.setString(1, moduleName)
                 ps.setString(2, projectId)
                 ps
