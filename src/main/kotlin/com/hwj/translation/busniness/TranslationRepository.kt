@@ -51,7 +51,7 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
     val addTranslationSB = java.lang.StringBuilder()
     fun addTranslationsV2(commonParam: CommonParam<*>): CommonResponse<List<Translation>> {
 
-        return parseRealListPram(commonParam,Translation::class.java)?.let { translationList ->
+        return parseRealListPram(commonParam, Translation::class.java)?.let { translationList ->
             val failedList = mutableListOf<Translation>()
             return try {
                 translationList.forEach { translation ->
@@ -59,7 +59,7 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                         translation.languageId?.let { languageId ->
                             translation.translationKey?.let { translationKey ->
                                 translation.translationContent?.let { translationContent ->
-                                    translation.translationContent = handleSingleQuotes(addTranslationSB,translationContent)
+                                    translation.translationContent = handleSingleQuotes(addTranslationSB, translationContent)
                                     val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(translationKey, projectId, languageId)
                                     if (translationDB.isNotEmpty()) {
                                         if (translation.forceAdd) {
@@ -138,29 +138,26 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                 module.moduleName = ""
                 module.projectId = projectId
                 var addModuleResult = mTranslationDao.addModule(module.moduleName, module.projectId!!)
-                if (!addModuleResult) {
-                    return null
-                }
-                val result  = mTranslationDao.queryModuleById(projectId)
-                if(result.isNotEmpty()){
+
+                if (addModuleResult != null) {
                     println("已创建module：$module")
-                    module = result[0]
-                    moduleCaches.put(projectId, module)
+                    module = addModuleResult
+                    moduleCaches[projectId] = module
 
                 }
             } else {
                 module = moduleDB[0]
                 println("数据库缓存：$module")
-                moduleCaches.put(projectId, module)
+                moduleCaches[projectId] = module
             }
-        }else{
+        } else {
             println("内存缓存：$module")
         }
         return module
     }
 
     fun mergeTranslationV2(commonParam: CommonParam<*>): CommonResponse<Void> {
-         return parseRealParam(commonParam, MergeTranslationParam::class.java)?.let { realParam ->
+        return parseRealParam(commonParam, MergeTranslationParam::class.java)?.let { realParam ->
             realParam.projectId?.let { projectId ->
                 realParam.mainTranslationKey?.let { mainTranslationKey ->
                     val mainTranslationList = mTranslationDao.queryTranslationByKey(mainTranslationKey, projectId)
@@ -178,7 +175,7 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                                     }
                                 }
                                 val deleteSuccess = mTranslationDao.deleteTranslationByKey(deleteTranslationKey, projectId)
-                                 if (deleteSuccess) {
+                                if (deleteSuccess) {
                                     commentBuilder.append(deleteTranslationKey).append(",")
                                 }
                             }

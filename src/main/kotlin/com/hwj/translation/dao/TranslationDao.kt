@@ -54,7 +54,7 @@ interface TranslationDao {
     fun deleteTranslationByTranslationId(translationId: Int): Boolean
 
     /**Module*/
-    fun addModule(moduleName: String, projectId: String): Boolean
+    fun addModule(moduleName: String, projectId: String): com.hwj.translation.bean.Module?
 
     fun deleteModule(moduleId: Int?, projectId: String): Boolean
 

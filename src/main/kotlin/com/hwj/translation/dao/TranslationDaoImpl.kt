@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.BeanPropertyRowMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.PreparedStatementSetter
+import org.springframework.jdbc.support.GeneratedKeyHolder
 import org.springframework.stereotype.Service
 
 @Service("translationDaoImpl")
@@ -143,7 +144,7 @@ class TranslationDaoImpl : TranslationDao {
 
     override fun updateLanguage2(languageId: Int, languageName: String, languageDes: String, languageOrder: Int): Boolean {
 //        val sqlStr2 = "UPDATE TB_TRANSLATION SET translationContent=? ,translationKey=?  ,comment=? ,referto=?, hide=? WHERE translationId=?"
-        val sqlStr  = "UPDATE TB_LANGUAGE    SET languageName=?       ,languageDes=?     , languageOrder=?                      WHERE languageId=?"
+        val sqlStr = "UPDATE TB_LANGUAGE    SET languageName=?       ,languageDes=?     , languageOrder=?                      WHERE languageId=?"
         println("sqlStr -> $sqlStr")
         return try {
             mJdbcTemplate.update(sqlStr) {
@@ -239,9 +240,9 @@ class TranslationDaoImpl : TranslationDao {
                                 it.setString(3, translation.translationContent?.trim())
                                 it.setString(4, projectId)
                                 it.setInt(5, moduleId)
-                                it.setString(6,translation.comment?:"")
-                                it.setString(7,translation.referto?:"")
-                                it.setInt(8,translation.hide?:0)
+                                it.setString(6, translation.comment ?: "")
+                                it.setString(7, translation.referto ?: "")
+                                it.setInt(8, translation.hide ?: 0)
                             } > 0
                         } catch (e: Exception) {
                             print("Key:$key -> ${translation.translationContent}")
@@ -367,17 +368,35 @@ class TranslationDaoImpl : TranslationDao {
         }
     }
 
-    override fun addModule(moduleName: String, projectId: String): Boolean {
+    override fun addModule(moduleName: String, projectId: String): Module? {
         val sqlStr =
             "INSERT INTO TB_FUNCTION_MODULE(moduleName,projectId) VALUES(?,?)"
         println("sqlStr -> $sqlStr")
         return try {
-            mJdbcTemplate.update(sqlStr) {
-                it.setString(1, moduleName)
-                it.setString(2, projectId)
-            } > 0
+            val keyHolder = GeneratedKeyHolder()
+
+            val affectedRows = mJdbcTemplate.update({ connection ->
+                val ps = connection.prepareStatement(sqlStr, arrayOf("id"))
+                ps.setString(1, moduleName)
+                ps.setString(2, projectId)
+                ps
+            }, keyHolder)
+
+            if (affectedRows > 0) {
+                keyHolder.key?.let {
+                    println("新增Module : ${it.toLong()}")
+                    Module().apply {
+                        this.moduleId = it.toInt()
+                        this.moduleName = moduleName
+                        this.projectId = projectId
+                    }
+                }
+            } else {
+                null
+            }
+
         } catch (e: java.lang.Exception) {
-            false
+            null
         }
     }
 
@@ -429,7 +448,7 @@ class TranslationDaoImpl : TranslationDao {
         return modules
     }
 
-    override fun queryModuleById( projectId: String): List<Module> {
+    override fun queryModuleById(projectId: String): List<Module> {
         val sqlStr = "SELECT * FROM TB_FUNCTION_MODULE WHERE projectId=?"
 //        println("sqlStr -> $sqlStr")
         val modules = mJdbcTemplate.query(sqlStr, PreparedStatementSetter {

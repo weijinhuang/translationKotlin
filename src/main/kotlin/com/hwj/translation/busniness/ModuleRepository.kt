@@ -10,7 +10,7 @@ class ModuleRepository(translationDao: TranslationDao) : BaseRepository(translat
     fun getAllModulesV2(commonParam: CommonParam<*>): CommonResponse<List<Module>> {
         return parseRealParam(commonParam, String::class.java)?.let { projectId ->
             var moduleList = mTranslationDao.getAllModules(projectId)
-            if (moduleList.size == 0) {
+            if (moduleList.isEmpty()) {
                 mTranslationDao.addModule("default", projectId)
             }
             moduleList = mTranslationDao.getAllModules(projectId)
@@ -22,14 +22,14 @@ class ModuleRepository(translationDao: TranslationDao) : BaseRepository(translat
 
     fun addModuleV2(commonParam: CommonParam<*>): CommonResponse<Void> {
         return parseRealParam(commonParam, Module::class.java)?.let { module ->
-            if (module.moduleName.isNullOrEmpty() || module.projectId.isNullOrEmpty()) {
+            if (module.moduleName.isEmpty() || module.projectId.isNullOrEmpty()) {
                 return CommonResponse(-1, "參數錯誤", null)
             }
-            val queryModuleByName = mTranslationDao.queryModuleByName(module.moduleName!!, module.projectId!!)
+            val queryModuleByName = mTranslationDao.queryModuleByName(module.moduleName, module.projectId!!)
             if (queryModuleByName.isNotEmpty()) {
                 return CommonResponse(-1, "已有相同模块", null)
             }
-            mTranslationDao.addModule(module.moduleName!!, module.projectId!!)
+            mTranslationDao.addModule(module.moduleName, module.projectId!!)
             CommonResponse(200, "", null)
         } ?: CommonResponse(-1, "参数解析出错", null)
 

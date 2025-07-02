@@ -64,9 +64,10 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
                                 var moduleId = 0
                                 oldModules.forEach { module ->
                                     module.projectId = project.projectId
-                                    mTranslationDao.addModule(module.moduleName, projectId = project.projectId!!)
+                                    val addModule = mTranslationDao.addModule(module.moduleName, projectId = project.projectId!!)
+                                    moduleId = addModule?.moduleId?:0
                                 }
-                                moduleId = mTranslationDao.getAllModules(project.projectId!!).first().moduleId
+
                                 val oldLanguages = mTranslationDao.getLanguageList(targetProjectId)
                                 oldLanguages.forEach { oldLanguage ->
                                     mTranslationDao.addLanguage2(oldLanguage.languageDes!!, oldLanguage.languageName!!, project.projectId!!)?.let { addLanguage ->

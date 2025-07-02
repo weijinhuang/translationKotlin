@@ -203,24 +203,21 @@ class MainController {
     }
 
 
-    val moduleCaches = HashMap<Int, Module>()
+    val moduleCaches = HashMap<String, Module>()
 
     fun getModule(translation: Translation, projectId: String): Module? {
-        var module = moduleCaches[translation.moduleId]
+        var module = moduleCaches[translation.projectId]
         if (module == null) {
             var moduleDB = mTranslationDao.queryModuleById(projectId)
             if (moduleDB.isEmpty()) {
-                module = Module()
-                module.moduleName = ""
-                module.projectId = projectId
-                var addModuleResult = mTranslationDao.addModule(module.moduleName, module.projectId!!)
-                if (!addModuleResult) {
-                    return null
-                }
+                module = mTranslationDao.addModule("", projectId)
             } else {
                 module = moduleDB[0]
-                moduleCaches.put(translation.moduleId ?: 0, module)
             }
+            if (null != module) {
+                moduleCaches.put(translation.projectId ?: "", module)
+            }
+
         }
         return module
     }
@@ -348,7 +345,7 @@ class MainController {
                     }
                     sortTranslationList?.let { sortTranslationList ->
                         sortTranslationList.forEach { sortTranslation ->
-                            sortTranslation.translationKey?.let {translationKey->
+                            sortTranslation.translationKey?.let { translationKey ->
                                 row {
                                     cell(translationKey)
                                     mainLanguageList.forEach { language ->
