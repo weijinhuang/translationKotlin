@@ -12,6 +12,7 @@ interface TranslationDao {
     fun deleteProject(project: Project): Boolean
     fun addProject(project: Project): Boolean
 
+
     fun queryProjectsByProjectId(projectId: String): List<Project?>?
 
 
@@ -35,7 +36,9 @@ interface TranslationDao {
     fun queryTranslationByKey(key: String, projectId: String): List<Translation>
     fun queryTranslationByModule(moduleId: Int, projectId: String): List<Translation>
 
-    fun addTranslation(translation: Translation): Boolean
+    fun addTranslation(translation: Translation): Translation?
+
+    fun addTranslation(translations: List<Translation>): Boolean
 
     fun updateTranslation(translation: Translation): Boolean
 

@@ -9,6 +9,8 @@ class Project() {
     var translationCount: Int = 0
 
     var copyFromProject: String? = null
+
+    var languageList:List<Language>? = null
     override fun toString(): String {
         return "Project(package_name=$projectId, project_name=$projectName)"
     }

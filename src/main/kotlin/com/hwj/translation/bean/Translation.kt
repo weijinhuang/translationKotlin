@@ -30,3 +30,35 @@ class Translation() {
 
 
 }
+/**
+override fun addLanguage2(languageDes: String, languageName: String, projectId: String): Language? {
+val sqlStr = "INSERT INTO TB_LANGUAGE(languageDes,languageName,projectId) VALUES(?,?,?)"
+println("sqlStr -> $sqlStr")
+
+val keyHolder = GeneratedKeyHolder()
+
+val affectedRows = mJdbcTemplate.update({ connection ->
+val ps = connection.prepareStatement(sqlStr, arrayOf("languageId"))
+ps.setString(1, languageDes)
+ps.setString(2, languageName)
+ps.setString(3, projectId)
+ps
+}, keyHolder)
+
+return if (affectedRows > 0) {
+keyHolder.key?.let {
+val languageId = it.toInt()
+println("新增Language:$languageId")
+Language().apply {
+this.languageId = languageId?.toInt()
+this.languageName = languageName
+this.languageDes = languageDes
+this.projectId = projectId
+this.languageOrder = 0
+}
+} ?: null
+} else {
+return null
+}
+}
+ */

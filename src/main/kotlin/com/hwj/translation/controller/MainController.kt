@@ -14,8 +14,7 @@ import com.hwj.translation.busniness.ModuleRepository
 import com.hwj.translation.busniness.ProjectRepository
 import com.hwj.translation.busniness.TranslationRepository
 import com.hwj.translation.dao.TranslationDaoImpl
-import com.hwj.translation.util.handleSingleQuotes
-import com.hwj.translation.util.log
+import com.hwj.translation.util.*
 import io.github.evanrupert.excelkt.workbook
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.beans.factory.annotation.Autowired
@@ -23,6 +22,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
 import java.io.*
 import java.lang.reflect.Type
 import java.util.*
@@ -767,6 +767,31 @@ class MainController {
         deleteCache(File("$currentDir/cache"))
 
     }
+
+    @CrossOrigin
+    @PostMapping("/upload-translations")
+    fun uploadTranslations(
+        @RequestParam("file") file: MultipartFile
+    ): CommonResponse<List<TranslationParseSimpleInfo>> {
+        val filename = file.originalFilename ?: "unknown"
+        val response = if (file.isEmpty) {
+            CommonResponse(-1, "文件为空", emptyList())
+        } else {
+            try {
+                getParserForFile(filename)?.let { parser ->
+                    val content = String(file.bytes, Charsets.UTF_8)
+                    val translations = parser.parse(content)
+                    CommonResponse(200, "", translations)
+                } ?: CommonResponse(-1, "", emptyList())
+            } catch (e: Exception) {
+                e.printStackTrace()
+                CommonResponse(-1, e.message, emptyList())
+            }
+        }
+        println("解析$filename 翻译数量：${response.data?.size}")
+        return response
+    }
+
 
     fun <PARAM> parseRealParam(param: CommonParam<*>, clazz: Class<PARAM>): PARAM? {
         return mObjectMapper.convertValue(param.data, clazz)

@@ -6,11 +6,14 @@ import com.hwj.translation.bean.Project
 import com.hwj.translation.bean.Translation
 import com.hwj.translation.print
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.BeanPropertyRowMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.PreparedStatementSetter
 import org.springframework.jdbc.support.GeneratedKeyHolder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.sql.PreparedStatement
 
 @Service("translationDaoImpl")
 class TranslationDaoImpl : TranslationDao {
@@ -101,7 +104,7 @@ class TranslationDaoImpl : TranslationDao {
 
         val keyHolder = GeneratedKeyHolder()
 
-        val affectedRows = mJdbcTemplate.update({connection->
+        val affectedRows = mJdbcTemplate.update({ connection ->
             val ps = connection.prepareStatement(sqlStr, arrayOf("languageId"))
             ps.setString(1, languageDes)
             ps.setString(2, languageName)
@@ -109,7 +112,7 @@ class TranslationDaoImpl : TranslationDao {
             ps
         }, keyHolder)
 
-        return if(affectedRows>0){
+        return if (affectedRows > 0) {
             keyHolder.key?.let {
                 val languageId = it.toInt()
                 println("新增Language:$languageId")
@@ -120,26 +123,10 @@ class TranslationDaoImpl : TranslationDao {
                     this.projectId = projectId
                     this.languageOrder = 0
                 }
-            }?:null
-        }else{
+            } ?: null
+        } else {
             return null
         }
-
-//        val success = mJdbcTemplate.update(sqlStr) {
-//            it.setString(1, languageDes)
-//            it.setString(2, languageName)
-//            it.setString(3, projectId)
-//        } > 0
-//        return if (success) {
-//            val queryStr = "SELECT * FROM TB_LANGUAGE WHERE projectId=? AND languageName=?"
-//            val languageList = mJdbcTemplate.query(queryStr, PreparedStatementSetter {
-//                it.setString(1, projectId)
-//                it.setString(2, languageName)
-//            }, BeanPropertyRowMapper(Language::class.java))
-//            languageList.first()
-//        } else {
-//            null
-//        }
     }
 
     override fun deleteLanguage(languageId: Int): Boolean {
@@ -249,43 +236,125 @@ class TranslationDaoImpl : TranslationDao {
         }, BeanPropertyRowMapper(Translation::class.java))
     }
 
-    override fun addTranslation(translation: Translation): Boolean {
+    override fun addTranslation(translations: List<Translation>): Boolean {
+        val batchSize = 1000
+        val startTime = System.currentTimeMillis()
+        translations.chunked(batchSize).forEachIndexed { index, batch ->
+            println("处理批次: ${index + 1}/${translations.size / batchSize}")
+            batchAddTranslationsDeepSeek(batch)
+        }
+        val endTime = System.currentTimeMillis()
+        val spendTime = endTime - startTime
+        println("DeepSeek 批量插入完成，总共成功插入: ${translations.size} 条记录 花费时间：${spendTime}")
+//        batchAddTranslationsDoubao(translations)
+        return true
+    }
+
+    private fun batchAddTranslationsDoubao(translations: List<Translation>): Boolean {
+        val startTime = System.currentTimeMillis()
+        println("开始批量插入翻译数据，总数: ${translations.size} ")
+        if (translations.isEmpty()) return true
+
+        val batchSize = 1000 // 每批处理的记录数，可根据数据库和性能调整
+        val batches = translations.chunked(batchSize)
+        var totalSuccess = 0
+
+        try {
+            batches.forEachIndexed { batchIndex, batch ->
+                val sql = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId,comment,referto, hide) VALUES(?,?,?,?,?,?,?,?)"
+                val batchArgs = batch.map { translation ->
+                    arrayOf(
+                        translation.translationKey?.trim(),
+                        translation.languageId,
+                        translation.translationContent?.trim(),
+                        translation.projectId,
+                        translation.moduleId ?: -1,
+                        translation.comment ?: "",
+                        translation.referto ?: "",
+                        translation.hide ?: 0
+                    )
+                }
+
+                val updateCounts = mJdbcTemplate.batchUpdate(sql, batchArgs)
+                totalSuccess += updateCounts.sum()
+                println("完成批次 ${batchIndex + 1}/${batches.size}，成功插入: ${updateCounts.sum()} 条")
+            }
+
+            val endTime = System.currentTimeMillis()
+            val spendTime = endTime - startTime
+            println("豆包批量插入完成，总共成功插入: $totalSuccess 条记录 花费时间：${spendTime}")
+            return totalSuccess == translations.size
+        } catch (e: Exception) {
+            println("批量插入失败: ${e.message}")
+            e.printStackTrace()
+            return false
+        }
+    }
+
+
+    private fun batchAddTranslationsDeepSeek(translations: List<Translation>): Boolean {
+        val result = try {
+            val sqlStr2 = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId,comment,referto, hide) VALUES(?,?,?,?,?,?,?,?)"
+
+            mJdbcTemplate.batchUpdate(sqlStr2, object : BatchPreparedStatementSetter {
+                override fun setValues(ps: PreparedStatement, i: Int) {
+                    val t = translations[i]
+                    with(t) {
+                        ps.setString(1, translationKey?.trim() ?: "")
+                        ps.setInt(2, languageId ?: 0)
+                        ps.setString(3, translationContent?.trim() ?: "")
+                        ps.setString(4, projectId ?: "")
+                        ps.setInt(5, moduleId ?: -1)
+                        ps.setString(6, comment ?: "")
+                        ps.setString(7, referto ?: "")
+                        ps.setInt(8, hide ?: 0)
+                    }
+                }
+
+                override fun getBatchSize() = translations.size
+            })
+            true
+        } catch (e: Exception) {
+            false
+        }
+        return result
+    }
+
+    override fun addTranslation(translation: Translation): Translation? {
         println("新增翻译：$translation")
-        return try {
+        var result: Translation? = null
+        try {
             translation.projectId?.let { projectId ->
                 translation.translationKey?.let { key ->
                     translation.languageId?.let { languageId ->
-                        val moduleId = translation.moduleId ?: -1
-
                         val sqlStr2 = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId,comment,referto, hide) VALUES(?,?,?,?,?,?,?,?)"
-                        try {
-                            mJdbcTemplate.update(
-                                sqlStr2
-                            ) {
-                                it.setString(1, key.trim())
-                                it.setInt(2, languageId)
-                                it.setString(3, translation.translationContent?.trim())
-                                it.setString(4, projectId)
-                                it.setInt(5, moduleId)
-                                it.setString(6, translation.comment ?: "")
-                                it.setString(7, translation.referto ?: "")
-                                it.setInt(8, translation.hide ?: 0)
-                            } > 0
-                        } catch (e: Exception) {
-                            print("Key:$key -> ${translation.translationContent}")
-                            e.printStackTrace()
-                            false
+                        val keyHolder = GeneratedKeyHolder()
+                        val affectedRows = mJdbcTemplate.update({ connection ->
+                            val ps = connection.prepareStatement(sqlStr2, arrayOf("translationId"))
+                            ps.setString(1, key.trim())
+                            ps.setInt(2, languageId)
+                            ps.setString(3, translation.translationContent?.trim())
+                            ps.setString(4, projectId)
+                            ps.setInt(5, translation.moduleId ?: -1)
+                            ps.setString(6, translation.comment ?: "")
+                            ps.setString(7, translation.referto ?: "")
+                            ps.setInt(8, translation.hide ?: 0)
+                            ps
+                        }, keyHolder)
+                        if (affectedRows > 0) {
+                            keyHolder.key?.let {
+                                translation.translationId = it.toInt()
+                                println("添加翻译成功，id：${translation.translationId}")
+                                result = translation
+                            }
                         }
-
                     }
-
                 }
-            } ?: false
+            }
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
-            false
         }
-
+        return result
     }
 
     override fun updateTranslation(translation: Translation): Boolean {
