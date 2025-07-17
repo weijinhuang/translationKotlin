@@ -108,6 +108,7 @@ class MainController {
             ADD_LANGUAGE -> mLanguageRepository.addLanguagesV2(param)
             UPDATE_LANGUAGE -> mLanguageRepository.updateLanguageV2(param)
 
+            CHECK_TRANSLATION_kEY->mTranslationRepository.checkTranslationByKeyInProject(param)
             GET_ALL_TRANSLATION -> mTranslationRepository.getTranslationListV2(param)
             DELETE_TRANSLATION_BY_KEY -> mTranslationRepository.deleteTranslationByTranslationKeyV2(param)
             ADD_TRANSLATION -> mTranslationRepository.addTranslationsV2(param)
@@ -778,6 +779,7 @@ class MainController {
             CommonResponse(-1, "文件为空", emptyList())
         } else {
             try {
+                println("接收到文件：$filename")
                 getParserForFile(filename)?.let { parser ->
                     val content = String(file.bytes, Charsets.UTF_8)
                     val translations = parser.parse(content)

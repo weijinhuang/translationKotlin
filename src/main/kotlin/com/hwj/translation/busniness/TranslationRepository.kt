@@ -3,15 +3,19 @@ package com.hwj.translation.busniness
 import com.hwj.translation.bean.CommonResponse
 import com.hwj.translation.bean.Module
 import com.hwj.translation.bean.Translation
-import com.hwj.translation.bean.param.CommonParam
-import com.hwj.translation.bean.param.DeleteTranslationParam
-import com.hwj.translation.bean.param.GetTranslationParam
-import com.hwj.translation.bean.param.MergeTranslationParam
+import com.hwj.translation.bean.param.*
 import com.hwj.translation.dao.TranslationDao
 import com.hwj.translation.util.handleSingleQuotes
 
 class TranslationRepository(translationDao: TranslationDao) : BaseRepository(translationDao) {
 
+
+    fun checkTranslationByKeyInProject(param:CommonParam<*>):CommonResponse<Int>{
+        return parseRealParam(param,CheckTranslationCountOfKeyInProjectParam::class.java)?.let {realParam->
+            val count = mTranslationDao.getTranslationCountOfKeyInProject(realParam.projectId,realParam.translationKey);
+            CommonResponse(200, "", count)
+        }?:CommonResponse(-1,"",null)
+    }
 
     fun getTranslationListV2(param: CommonParam<*>): CommonResponse<List<Translation>> {
         return parseRealParam(param, GetTranslationParam::class.java)?.let { realParam ->

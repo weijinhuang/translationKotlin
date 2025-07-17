@@ -2,6 +2,7 @@ package com.hwj.translation.bean
 
 class InterfaceName {
 }
+const val CHECK_TRANSLATION_kEY = "checkTranslationKey"
 
 const val GET_ALL_PROJECTS = "getAllProjects"
 
