@@ -425,6 +425,18 @@ class TranslationDaoImpl : TranslationDao {
         }
     }
 
+    override fun getTranslationCountOfKeyInProject(projectId: String, translationKey: String): Int {
+        val sqlStr = "SELECT COUNT(*) FROM tb_translation WHERE projectId=? AND translationKey=?"
+        println("sqlStr -> $sqlStr")
+        return try {
+            mJdbcTemplate.queryForObject(sqlStr, Integer::class.java, projectId, translationKey) as Int
+
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            0
+        }
+    }
+
     override fun getTranslationCountOfProject(projectId: String): Int {
         val sqlStr = "SELECT COUNT(*) FROM tb_translation WHERE projectId=?"
         println("sqlStr -> $sqlStr")

@@ -1,3 +1,6 @@
 package com.hwj.translation.bean.param
 
-data class CheckTranslationCountOfKeyInProjectParam(val projectId:String, val translationKey:String)
+class CheckTranslationCountOfKeyInProjectParam(){
+    var projectId:String? = null
+    var translationKey:String? = null
+}

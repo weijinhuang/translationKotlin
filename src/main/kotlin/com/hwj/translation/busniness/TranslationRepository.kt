@@ -10,11 +10,11 @@ import com.hwj.translation.util.handleSingleQuotes
 class TranslationRepository(translationDao: TranslationDao) : BaseRepository(translationDao) {
 
 
-    fun checkTranslationByKeyInProject(param:CommonParam<*>):CommonResponse<Int>{
-        return parseRealParam(param,CheckTranslationCountOfKeyInProjectParam::class.java)?.let {realParam->
-            val count = mTranslationDao.getTranslationCountOfKeyInProject(realParam.projectId,realParam.translationKey);
+    fun checkTranslationByKeyInProject(param: CommonParam<*>): CommonResponse<Int> {
+        return parseRealParam(param, CheckTranslationCountOfKeyInProjectParam::class.java)?.let { realParam ->
+            val count = mTranslationDao.getTranslationCountOfKeyInProject(realParam.projectId ?: "", realParam.translationKey ?: "")
             CommonResponse(200, "", count)
-        }?:CommonResponse(-1,"",null)
+        } ?: CommonResponse(-1, "", null)
     }
 
     fun getTranslationListV2(param: CommonParam<*>): CommonResponse<List<Translation>> {
@@ -64,37 +64,49 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                             translation.translationKey?.let { translationKey ->
                                 translation.translationContent?.let { translationContent ->
                                     translation.translationContent = handleSingleQuotes(addTranslationSB, translationContent)
+                                    val module = getModule(translation, projectId) ?: return CommonResponse(-1, "添加模块失败", null)
                                     if (translation.translationId == null || translation.translationId == -1) {
-                                        val resultTranslation = mTranslationDao.addTranslation(translation)
-                                        if(resultTranslation != null){
-                                            print(" ${translation.translationKey} 添加成功, content:${translation.translationContent}")
-                                        }else{
-                                            print(" ${translation.translationKey} 添加失败, content:${translation.translationContent}")
-                                        }
-                                    }else{
+                                        translation.moduleId = module.moduleId
                                         val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(translationKey, projectId, languageId)
                                         if (translationDB.isNotEmpty()) {
                                             if (translation.forceAdd) {
+                                                print(" ${translation.translationKey} 已存在 更新内容")
                                                 translation.translationId = translationDB[0].translationId
-                                                var updateSuccess = mTranslationDao.updateTranslation(translation)
-                                                if (!updateSuccess) {
-                                                    print("更新失败 $translation")
-                                                    failedList.add(translation)
+                                                var newTranslationSuccess = mTranslationDao.updateTranslation(translation)
+                                                if (!newTranslationSuccess) {
+                                                    print("新增失败 $translation")
                                                 }
                                             } else {
-                                                print(" ${translation.translationKey} 已存在")
                                                 if (translation.translationContent != translationDB[0].translationContent) {
                                                     translation.oldTranslationContent = translationDB[0].translationContent
                                                     failedList.add(translation)
                                                 }
                                             }
                                         } else {
-                                            val module = getModule(translation, projectId) ?: return CommonResponse(-1, "添加模块失败", null)
+                                            val resultTranslation = mTranslationDao.addTranslation(translation)
+                                            if (resultTranslation != null) {
+                                                println(" ${translation.translationKey} 添加成功, content:${translation.translationContent}")
+                                            } else {
+                                                print(" ${translation.translationKey} 添加失败, content:${translation.translationContent}")
+                                            }
+                                        }
+
+
+                                    } else {
+                                        val translationDB = mTranslationDao.queryTranslationByKeyInLanguage(translationKey, projectId, languageId)
+                                        if (translationDB.isNotEmpty()) {
+                                            val localTranslation = translationDB[0]
+                                            if (translation.translationId == localTranslation.translationId) {//冲突的翻译是同一个，更新即可
+                                                var updateSuccess = mTranslationDao.updateTranslation(translation)
+                                                print("更新 $updateSuccess")
+                                            } else {////冲突的翻译不是同一个
+                                                print(" ${translation.translationKey} 已存在")
+                                            }
+                                        } else {
                                             translation.moduleId = module.moduleId
                                             val success = mTranslationDao.addTranslation(translation)
                                             if (success == null) {
                                                 print(" ${translation.translationKey} 添加失败, content:${translation.translationContent}")
-                                                failedList.add(translation)
                                             } else {
                                                 print(" ${translation.translationKey} 添加成功, content:${translation.translationContent}")
                                             }
@@ -154,18 +166,18 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                 var addModuleResult = mTranslationDao.addModule(module.moduleName, module.projectId!!)
 
                 if (addModuleResult != null) {
-                    println("已创建module：$module")
+                    println("已创建module：${module.moduleId}")
                     module = addModuleResult
                     moduleCaches[projectId] = module
 
                 }
             } else {
                 module = moduleDB[0]
-                println("数据库缓存：$module")
+                println("数据库缓存module：${module.moduleId}")
                 moduleCaches[projectId] = module
             }
         } else {
-            println("内存缓存：$module")
+            println("内存缓存module：${module.moduleId}")
         }
         return module
     }

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Android Interaction Example</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        button, input {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<input type="text" id="feedbackInput" placeholder="Enter feedback URL">
+<button id="feedbackButton">Go to Feedback</button>
+
+<script>
+        document.getElementById('feedbackButton').addEventListener('click', function() {
+            // 获取输入框中的URL
+            var str = document.getElementById('feedbackInput').value;
+
+            // 调用Android端的JavaScript接口
+            if (window.longSeWebInterface && typeof window.longSeWebInterface.onPaySuccess === 'function') {
+                window.longSeWebInterface.onPaySuccess(cso_id);
+            } else {
+                console.error('Android interface not available or method not found.');
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
