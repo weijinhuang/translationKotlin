@@ -19,12 +19,15 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
 
     fun getTranslationListV2(param: CommonParam<*>): CommonResponse<List<Translation>> {
         return parseRealParam(param, GetTranslationParam::class.java)?.let { realParam ->
+            val startTime = System.nanoTime()
             val translationList = if (null == realParam.moduleId) {
                 mTranslationDao.getAllTranslationByProjectId(realParam.projectId)
+
             } else {
                 mTranslationDao.queryTranslationByModule(realParam.moduleId!!, realParam.projectId)
             }
-            println("查詢到翻譯：${translationList.size}")
+            val endTime = System.nanoTime()
+            println("查詢到翻譯：${translationList.size} 花费时间：${endTime - startTime} 纳秒")
             CommonResponse(200, "", translationList.filter { it.hide == 0 })
         } ?: CommonResponse(-1, "参数错误", emptyList())
     }
@@ -58,13 +61,14 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
         return parseRealListPram(commonParam, Translation::class.java)?.let { translationList ->
             val failedList = mutableListOf<Translation>()
             return try {
+                val startTime = System.currentTimeMillis()
                 translationList.forEach { translation ->
                     translation.projectId?.let { projectId ->
                         translation.languageId?.let { languageId ->
                             translation.translationKey?.let { translationKey ->
                                 translation.translationContent?.let { translationContent ->
                                     translation.translationContent = handleSingleQuotes(addTranslationSB, translationContent)
-                                    val module = getModule(translation, projectId) ?: return CommonResponse(-1, "添加模块失败", null)
+                                    val module = getModule(projectId) ?: return CommonResponse(-1, "添加模块失败", null)
                                     if (translation.translationId == null || translation.translationId == -1) {//新增翻译
                                         translation.moduleId = module.moduleId
                                         //先查询是否有冲突的key
@@ -122,6 +126,8 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                         }
                     }
                 }
+                val endTime = System.currentTimeMillis()
+                print("添加翻译结束，花费时间：${endTime - startTime}ms")
                 CommonResponse(200, "success", failedList)
             } catch (e: Exception) {
                 CommonResponse(-1, e.message, emptyList())
@@ -157,7 +163,7 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
 
     val moduleCaches = HashMap<String, Module>()//暂时没有用，为以后增加模块扩展预留
 
-    fun getModule(translation: Translation, projectId: String): Module? {
+    fun getModule(projectId: String): Module? {
         var module = moduleCaches[projectId]
         if (module == null) {
             println("未找到内存缓存，查找数据库")
@@ -220,6 +226,21 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                     }
                 } ?: CommonResponse(-1, "没有主翻译", null)
             } ?: CommonResponse(-1, "项目id为空", null)
+        } ?: CommonResponse(-1, "参数解析出错", null)
+    }
+
+    fun batchImportTranslation(commonParam: CommonParam<*>): CommonResponse<Void> {
+        return parseRealListPram(commonParam, Translation::class.java)?.let { translationList ->
+            if (translationList.isNotEmpty()) {
+                getModule(translationList.first().projectId ?: "")?.let { module ->
+                    mTranslationDao.batchImportTranslation(translationList, module.moduleId)
+                    CommonResponse(200, "", null)
+                } ?: CommonResponse(-1, "添加模块失败", null)
+
+
+            } else {
+                CommonResponse(200, "", null)
+            }
         } ?: CommonResponse(-1, "参数解析出错", null)
     }
 }

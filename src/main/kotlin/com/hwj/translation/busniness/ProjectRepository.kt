@@ -76,7 +76,7 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
                                 val oldModules = mTranslationDao.getAllModules(targetProjectId)
                                 var moduleId = 0
                                 oldModules.forEach { module ->
-                                    module.projectId = project.projectId
+                                    module.projectId = targetProjectId
                                     val addModule = mTranslationDao.addModule(module.moduleName, projectId = project.projectId!!)
                                     moduleId = addModule?.moduleId ?: 0
                                 }
@@ -100,7 +100,7 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
 //                                                println("复制翻译:$translation 失败")
 //                                            }
                                         }
-                                        mTranslationDao.addTranslation(oldTranslations)
+                                        mTranslationDao.addTranslation(oldTranslations,moduleId)
                                     }
                                 }
                                 val endTime = System.currentTimeMillis()

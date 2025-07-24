@@ -108,6 +108,7 @@ class MainController {
             ADD_LANGUAGE -> mLanguageRepository.addLanguagesV2(param)
             UPDATE_LANGUAGE -> mLanguageRepository.updateLanguageV2(param)
 
+            BATCH_ADD_TRANSLATION->mTranslationRepository.batchImportTranslation(param)
             CHECK_TRANSLATION_kEY->mTranslationRepository.checkTranslationByKeyInProject(param)
             GET_ALL_TRANSLATION -> mTranslationRepository.getTranslationListV2(param)
             DELETE_TRANSLATION_BY_KEY -> mTranslationRepository.deleteTranslationByTranslationKeyV2(param)

@@ -1,9 +1,7 @@
 package com.hwj.translation.dao
 
-import com.hwj.translation.bean.Language
-import com.hwj.translation.bean.Module
-import com.hwj.translation.bean.Project
-import com.hwj.translation.bean.Translation
+import com.hwj.translation.bean.*
+import com.hwj.translation.bean.param.CommonParam
 import com.hwj.translation.print
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.BatchPreparedStatementSetter
@@ -220,6 +218,94 @@ class TranslationDaoImpl : TranslationDao {
         }, BeanPropertyRowMapper(Translation::class.java))
     }
 
+    override fun batchImportTranslation(translations: List<Translation>, defaultModuleId: Int): Boolean {
+        val SQL_UPSERT = """
+            INSERT INTO tb_translation (
+                translationKey, languageId, translationContent, 
+                projectId, moduleId, comment, hide, referto
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                translationContent = ?,
+                comment = ?,
+                hide = ?,
+                referto = ?
+        """
+        val batchSize = 1000 // 每批处理量
+        val startTime = System.currentTimeMillis()
+        println("批量插入开始")
+        translations.chunked(batchSize).forEach { chunk ->
+            mJdbcTemplate.batchUpdate(SQL_UPSERT, object : BatchPreparedStatementSetter {
+                override fun setValues(ps: PreparedStatement, i: Int) {
+                    val t = chunk[i]
+                    t.translationKey?.let { translationKey ->
+                        t.languageId?.let { languageId ->
+                            t.projectId?.let { projectId ->
+                                t.moduleId?.let { moduleId ->
+                                    ps.setString(1, translationKey)
+                                    ps.setInt(2, languageId)
+                                    ps.setString(3, t.translationContent)
+                                    ps.setString(4, t.projectId)
+                                    ps.setInt(5, t.moduleId ?: defaultModuleId)
+                                    ps.setString(6, t.comment)
+                                    ps.setInt(7, t.hide)
+                                    ps.setString(8, t.referto)
+                                    // 更新字段 (VALUES()获取传入值)
+                                    ps.setString(9, t.translationContent)
+                                    ps.setString(10, t.comment)
+                                    ps.setInt(11, t.hide)
+                                    ps.setString(12, t.referto)
+                                }
+                            }
+                        }
+                    }
+
+                }
+
+                override fun getBatchSize() = chunk.size
+            })
+        }
+
+        val endTime = System.currentTimeMillis()
+        println("batchImportTranslation结束，花费时间：${endTime - startTime}")
+        return true
+    }
+
+    private fun batchAddTranslationsDeepSeek(translations: List<Translation>, defaultModuleId: Int): Boolean {
+        val result = try {
+            val sqlStr2 = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId,comment,referto, hide) VALUES(?,?,?,?,?,?,?,?)"
+
+            mJdbcTemplate.batchUpdate(sqlStr2, object : BatchPreparedStatementSetter {
+                override fun setValues(ps: PreparedStatement, i: Int) {
+                    val t = translations[i]
+
+                    t.translationKey?.let { translationKey ->
+                        t.languageId?.let { languageId ->
+                            t.projectId?.let { projectId ->
+                                ps.setString(1, translationKey.trim())
+                                ps.setInt(2, languageId)
+                                ps.setString(3, t.translationContent?.trim() ?: "")
+                                ps.setString(4, projectId)
+                                ps.setInt(5, t.moduleId ?: defaultModuleId)
+                                ps.setString(6, t.comment ?: "")
+                                ps.setString(7, t.referto ?: "")
+                                ps.setInt(8, t.hide ?: 0)
+                            }
+                            Unit
+                        }
+                        Unit
+                    }
+
+                }
+
+                override fun getBatchSize() = translations.size
+            })
+            true
+        } catch (e: Exception) {
+            false
+        }
+        return result
+    }
+
     override fun queryTranslationByKeyInLanguage(
         key: String,
         projectId: String,
@@ -236,12 +322,12 @@ class TranslationDaoImpl : TranslationDao {
         }, BeanPropertyRowMapper(Translation::class.java))
     }
 
-    override fun addTranslation(translations: List<Translation>): Boolean {
+    override fun addTranslation(translations: List<Translation>, defaultModuleId: Int): Boolean {
         val batchSize = 1000
         val startTime = System.currentTimeMillis()
         translations.chunked(batchSize).forEachIndexed { index, batch ->
             println("处理批次: ${index + 1}/${translations.size / batchSize}")
-            batchAddTranslationsDeepSeek(batch)
+            batchAddTranslationsDeepSeek(batch, defaultModuleId)
         }
         val endTime = System.currentTimeMillis()
         val spendTime = endTime - startTime
@@ -291,34 +377,6 @@ class TranslationDaoImpl : TranslationDao {
         }
     }
 
-
-    private fun batchAddTranslationsDeepSeek(translations: List<Translation>): Boolean {
-        val result = try {
-            val sqlStr2 = "INSERT INTO TB_TRANSLATION(translationKey,languageId,translationContent,projectId,moduleId,comment,referto, hide) VALUES(?,?,?,?,?,?,?,?)"
-
-            mJdbcTemplate.batchUpdate(sqlStr2, object : BatchPreparedStatementSetter {
-                override fun setValues(ps: PreparedStatement, i: Int) {
-                    val t = translations[i]
-                    with(t) {
-                        ps.setString(1, translationKey?.trim() ?: "")
-                        ps.setInt(2, languageId ?: 0)
-                        ps.setString(3, translationContent?.trim() ?: "")
-                        ps.setString(4, projectId ?: "")
-                        ps.setInt(5, moduleId ?: -1)
-                        ps.setString(6, comment ?: "")
-                        ps.setString(7, referto ?: "")
-                        ps.setInt(8, hide ?: 0)
-                    }
-                }
-
-                override fun getBatchSize() = translations.size
-            })
-            true
-        } catch (e: Exception) {
-            false
-        }
-        return result
-    }
 
     override fun addTranslation(translation: Translation): Translation? {
         println("新增翻译：$translation")

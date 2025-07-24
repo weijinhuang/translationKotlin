@@ -31,14 +31,14 @@ interface TranslationDao {
     fun queryTranslationByLanguage(languageId: Int, projectId: String): List<Translation>
     fun queryTranslationByLanguageWithHide(languageId: Int, projectId: String): List<Translation>
     fun getAllTranslationByProjectId(projectId: String): List<Translation>
-
+    fun batchImportTranslation(translations:List<Translation>,defaultModuleId: Int):Boolean
     fun queryTranslationByKeyInLanguage(key: String, projectId: String, languageId: Int): List<Translation>
     fun queryTranslationByKey(key: String, projectId: String): List<Translation>
     fun queryTranslationByModule(moduleId: Int, projectId: String): List<Translation>
 
     fun addTranslation(translation: Translation): Translation?
 
-    fun addTranslation(translations: List<Translation>): Boolean
+    fun addTranslation(translations: List<Translation>, defaultModuleId:Int): Boolean
 
     fun updateTranslation(translation: Translation): Boolean
 
