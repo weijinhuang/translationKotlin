@@ -3,6 +3,7 @@ package com.hwj.translation.busniness
 import com.hwj.translation.bean.CommonResponse
 import com.hwj.translation.bean.Module
 import com.hwj.translation.bean.Translation
+import com.hwj.translation.bean.TranslationRow
 import com.hwj.translation.bean.param.*
 import com.hwj.translation.dao.TranslationDao
 import com.hwj.translation.util.handleSingleQuotes
@@ -20,6 +21,7 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
     fun getTranslationListV2(param: CommonParam<*>): CommonResponse<List<Translation>> {
         return parseRealParam(param, GetTranslationParam::class.java)?.let { realParam ->
             val startTime = System.nanoTime()
+            val startTimeMs = System.currentTimeMillis();
             val translationList = if (null == realParam.moduleId) {
                 mTranslationDao.getAllTranslationByProjectId(realParam.projectId)
 
@@ -27,8 +29,39 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                 mTranslationDao.queryTranslationByModule(realParam.moduleId!!, realParam.projectId)
             }
             val endTime = System.nanoTime()
-            println("查詢到翻譯：${translationList.size} 花费时间：${endTime - startTime} 纳秒")
+            val endTimeMs = System.currentTimeMillis()
+            println("查詢到翻譯：${translationList.size} 花费时间：${endTime - startTime} ns  ${endTimeMs - startTimeMs} ms")
+            val map = translationList
+                .groupBy { it.translationKey!! }
+                .map { (key, translations) ->
+                    TranslationRow(
+                        key = key,
+                        translations = translations.associateBy { it.languageId!! }
+                    )
+                }
+
+            val endTimeMsOfTransform = System.currentTimeMillis()
+            println("转换花费时间：   ${endTimeMsOfTransform - endTimeMs} ms key数量：${map.size}")
             CommonResponse(200, "", translationList.filter { it.hide == 0 })
+        } ?: CommonResponse(-1, "参数错误", emptyList())
+    }
+
+    fun getTranslationListV3(param: CommonParam<*>): CommonResponse<List<TranslationRow>> {
+        return parseRealParam(param, GetTranslationParam::class.java)?.let { realParam ->
+            val translationList = if (null == realParam.moduleId) {
+                mTranslationDao.getAllTranslationByProjectId(realParam.projectId)
+            } else {
+                mTranslationDao.queryTranslationByModule(realParam.moduleId!!, realParam.projectId)
+            }
+            val translationRowList:List<TranslationRow> = translationList
+                .groupBy { it.translationKey!! }
+                .map { (key, translations) ->
+                    TranslationRow(
+                        key = key,
+                        translations = translations.associateBy { it.languageId!! }
+                    )
+                }
+            CommonResponse(200, "", translationRowList)
         } ?: CommonResponse(-1, "参数错误", emptyList())
     }
 

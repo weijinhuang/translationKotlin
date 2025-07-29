@@ -10,6 +10,7 @@ const val CHECK_TRANSLATION_kEY = "checkTranslationKey"
 const val GET_ALL_PROJECTS = "getAllProjects"
 
 const val GET_ALL_TRANSLATION = "getAllTranslation"
+const val GET_ALL_TRANSLATION_V3 = "getAllTranslationV3"
 
 const val TRANSLATE_BY_GOOGLE = "translateByGoogle"
 

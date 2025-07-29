@@ -111,6 +111,7 @@ class MainController {
             BATCH_ADD_TRANSLATION->mTranslationRepository.batchImportTranslation(param)
             CHECK_TRANSLATION_kEY->mTranslationRepository.checkTranslationByKeyInProject(param)
             GET_ALL_TRANSLATION -> mTranslationRepository.getTranslationListV2(param)
+            GET_ALL_TRANSLATION_V3 -> mTranslationRepository.getTranslationListV3(param)
             DELETE_TRANSLATION_BY_KEY -> mTranslationRepository.deleteTranslationByTranslationKeyV2(param)
             ADD_TRANSLATION -> mTranslationRepository.addTranslationsV2(param)
             UPDATE_TRANSLATION -> mTranslationRepository.updateTranslationsV2(param)
