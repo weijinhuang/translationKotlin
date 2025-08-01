@@ -1,16 +1,19 @@
 package com.hwj.translation.util
 
+import com.hwj.translation.bean.SimpleTranslationRow
 import com.hwj.translation.bean.TranslationParseSimpleInfo
+import com.hwj.translation.bean.TranslationRow
 import com.hwj.translation.interfaces.TranslationParser
 import org.w3c.dom.Document
 import org.w3c.dom.Node
 import org.xml.sax.InputSource
+import java.io.InputStream
 import java.io.StringReader
 import javax.xml.parsers.DocumentBuilderFactory
 
 class AndroidXmlParser  : TranslationParser {
-    override fun parse(xmlContent: String): List<TranslationParseSimpleInfo> {
-        val doc = parseXml(xmlContent)
+    override fun parse(content: String, stream: InputStream): List<SimpleTranslationRow> {
+        val doc = parseXml(content)
         val translationSimpleInfoList = mutableListOf<TranslationParseSimpleInfo>()
         val stringNodes = doc.getElementsByTagName("string")
         for (i in 0 until stringNodes.length) {
@@ -19,7 +22,7 @@ class AndroidXmlParser  : TranslationParser {
                 translationSimpleInfoList.add(translationSimpleInfo)
             }
         }
-        return translationSimpleInfoList
+        return listOf(SimpleTranslationRow("", translationSimpleInfoList))
     }
 
     private fun parseXml(xmlContent: String): Document {

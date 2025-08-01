@@ -108,8 +108,8 @@ class MainController {
             ADD_LANGUAGE -> mLanguageRepository.addLanguagesV2(param)
             UPDATE_LANGUAGE -> mLanguageRepository.updateLanguageV2(param)
 
-            BATCH_ADD_TRANSLATION->mTranslationRepository.batchImportTranslation(param)
-            CHECK_TRANSLATION_kEY->mTranslationRepository.checkTranslationByKeyInProject(param)
+            BATCH_ADD_TRANSLATION -> mTranslationRepository.batchImportTranslation(param)
+            CHECK_TRANSLATION_kEY -> mTranslationRepository.checkTranslationByKeyInProject(param)
             GET_ALL_TRANSLATION -> mTranslationRepository.getTranslationListV2(param)
             GET_ALL_TRANSLATION_V3 -> mTranslationRepository.getTranslationListV3(param)
             DELETE_TRANSLATION_BY_KEY -> mTranslationRepository.deleteTranslationByTranslationKeyV2(param)
@@ -775,18 +775,18 @@ class MainController {
     @PostMapping("/upload-translations")
     fun uploadTranslations(
         @RequestParam("file") file: MultipartFile
-    ): CommonResponse<List<TranslationParseSimpleInfo>> {
+    ): CommonResponse<List<SimpleTranslationRow>> {
         val filename = file.originalFilename ?: "unknown"
         val response = if (file.isEmpty) {
             CommonResponse(-1, "文件为空", emptyList())
         } else {
             try {
                 println("接收到文件：$filename")
-                getParserForFile(filename)?.let { parser ->
-                    val content = String(file.bytes, Charsets.UTF_8)
-                    val translations = parser.parse(content)
+                getParserForFile(filename).let { parser ->
+                    val content = if (parser is ExcelParser) "" else String(file.bytes, Charsets.UTF_8)
+                    val translations = parser.parse(content, file.inputStream)
                     CommonResponse(200, "", translations)
-                } ?: CommonResponse(-1, "", emptyList())
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
                 CommonResponse(-1, e.message, emptyList())

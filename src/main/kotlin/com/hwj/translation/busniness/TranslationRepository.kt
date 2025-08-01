@@ -21,7 +21,6 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
     fun getTranslationListV2(param: CommonParam<*>): CommonResponse<List<Translation>> {
         return parseRealParam(param, GetTranslationParam::class.java)?.let { realParam ->
             val startTime = System.nanoTime()
-            val startTimeMs = System.currentTimeMillis();
             val translationList = if (null == realParam.moduleId) {
                 mTranslationDao.getAllTranslationByProjectId(realParam.projectId)
 
@@ -29,26 +28,14 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                 mTranslationDao.queryTranslationByModule(realParam.moduleId!!, realParam.projectId)
             }
             val endTime = System.nanoTime()
-            val endTimeMs = System.currentTimeMillis()
-            println("查詢到翻譯：${translationList.size} 花费时间：${endTime - startTime} ns  ${endTimeMs - startTimeMs} ms")
-            val map = translationList
-                .groupBy { it.translationKey!! }
-                .map { (key, translations) ->
-                    TranslationRow(
-                        key = key,
-                        translations = translations.associateBy { it.languageId!! }
-                    )
-                }
-
-            val endTimeMsOfTransform = System.currentTimeMillis()
-            println("转换花费时间：   ${endTimeMsOfTransform - endTimeMs} ms key数量：${map.size}")
+            println("查詢到翻譯：${translationList.size} 花费时间：${endTime - startTime} 纳秒")
             CommonResponse(200, "", translationList.filter { it.hide == 0 })
         } ?: CommonResponse(-1, "参数错误", emptyList())
     }
 
     fun getTranslationListV3(param: CommonParam<*>): CommonResponse<List<TranslationRow>> {
         return parseRealParam(param, GetTranslationParam::class.java)?.let { realParam ->
-            val translationList = if (null == realParam.moduleId) {
+            val translationList:List<Translation> = if (null == realParam.moduleId) {
                 mTranslationDao.getAllTranslationByProjectId(realParam.projectId)
             } else {
                 mTranslationDao.queryTranslationByModule(realParam.moduleId!!, realParam.projectId)
@@ -58,7 +45,7 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                 .map { (key, translations) ->
                     TranslationRow(
                         key = key,
-                        translations = translations.associateBy { it.languageId!! }
+                        translations = translations
                     )
                 }
             CommonResponse(200, "", translationRowList)
