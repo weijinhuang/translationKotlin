@@ -219,28 +219,20 @@ class TranslationDaoImpl : TranslationDao {
     }
 
     override fun batchImportTranslation(translations: List<Translation>, defaultModuleId: Int): Boolean {
-        val SQL_UPSERT = """
-            INSERT INTO tb_translation (
-                translationKey, languageId, translationContent, 
-                projectId, moduleId, comment, hide, referto
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                translationContent = ?,
-                comment = ?,
-                hide = ?,
-                referto = ?
-        """
-        val batchSize = 1000 // 每批处理量
+        val SQL_UPSERT = "INSERT INTO tb_translation (translationKey, languageId, translationContent,projectId, moduleId, comment, hide, referto) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE translationContent = ?,comment = ?,hide = ?, referto = ?"
+        var batchSize = 1000 // 每批处理量
+        if(batchSize > translations.size){
+            batchSize = translations.size
+        }
         val startTime = System.currentTimeMillis()
-        println("批量插入开始")
+        println("批量插入开始 projectId:${translations.first().projectId}")
         translations.chunked(batchSize).forEach { chunk ->
-            mJdbcTemplate.batchUpdate(SQL_UPSERT, object : BatchPreparedStatementSetter {
+            val batchUpdateResult = mJdbcTemplate.batchUpdate(SQL_UPSERT, object : BatchPreparedStatementSetter {
                 override fun setValues(ps: PreparedStatement, i: Int) {
                     val t = chunk[i]
                     t.translationKey?.let { translationKey ->
                         t.languageId?.let { languageId ->
                             t.projectId?.let { projectId ->
-                                t.moduleId?.let { moduleId ->
                                     ps.setString(1, translationKey)
                                     ps.setInt(2, languageId)
                                     ps.setString(3, t.translationContent)
@@ -254,7 +246,6 @@ class TranslationDaoImpl : TranslationDao {
                                     ps.setString(10, t.comment)
                                     ps.setInt(11, t.hide)
                                     ps.setString(12, t.referto)
-                                }
                             }
                         }
                     }
@@ -263,6 +254,17 @@ class TranslationDaoImpl : TranslationDao {
 
                 override fun getBatchSize() = chunk.size
             })
+            var successLine = 0
+            var failedLine = 0
+            batchUpdateResult.forEach {
+                if (it > 0) {
+                    successLine++
+                } else {
+                    failedLine++
+                }
+            }
+
+            println("批量插入执行行数：${batchUpdateResult.size}, 成功：${successLine} 失败：${failedLine}")
         }
 
         val endTime = System.currentTimeMillis()

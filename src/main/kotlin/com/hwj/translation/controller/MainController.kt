@@ -776,6 +776,7 @@ class MainController {
     fun uploadTranslations(
         @RequestParam("file") file: MultipartFile
     ): CommonResponse<List<SimpleTranslationRow>> {
+        val startTime = System.currentTimeMillis()
         val filename = file.originalFilename ?: "unknown"
         val response = if (file.isEmpty) {
             CommonResponse(-1, "文件为空", emptyList())
@@ -792,7 +793,7 @@ class MainController {
                 CommonResponse(-1, e.message, emptyList())
             }
         }
-        println("解析$filename 翻译数量：${response.data?.size}")
+        println("解析$filename 翻译数量：${response.data?.size} 花费时间：ms${System.currentTimeMillis() - startTime}")
         return response
     }
 
