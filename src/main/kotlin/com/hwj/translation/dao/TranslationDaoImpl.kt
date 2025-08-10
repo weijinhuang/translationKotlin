@@ -210,7 +210,7 @@ class TranslationDaoImpl : TranslationDao {
     override fun queryTranslationByKey(key: String, projectId: String): List<Translation> {
         val sqlStr =
             "SELECT * FROM tb_translation WHERE translationKey=? AND projectId=?"
-//        println("sqlStr -> $sqlStr")
+        println(" SELECT * FROM tb_translation WHERE translationKey=$key AND projectId=$projectId")
         return mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
             it.setString(1, key)
             it.setString(2, projectId)

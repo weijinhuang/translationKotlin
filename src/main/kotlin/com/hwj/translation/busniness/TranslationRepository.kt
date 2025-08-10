@@ -35,16 +35,16 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
 
     fun getTranslationListV3(param: CommonParam<*>): CommonResponse<List<TranslationRow>> {
         return parseRealParam(param, GetTranslationParam::class.java)?.let { realParam ->
-            val translationList:List<Translation> = if (null == realParam.moduleId) {
+            val translationList: List<Translation> = if (null == realParam.moduleId) {
                 mTranslationDao.getAllTranslationByProjectId(realParam.projectId)
             } else {
                 mTranslationDao.queryTranslationByModule(realParam.moduleId!!, realParam.projectId)
             }
-            val translationRowList:List<TranslationRow> = translationList
+            val translationRowList: List<TranslationRow> = translationList
                 .groupBy { it.translationKey!! }
                 .map { (key, translations) ->
                     TranslationRow(
-                        key = key,
+                        translationKey = key,
                         translations = translations
                     )
                 }
@@ -74,6 +74,38 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
 
     }
 
+
+    fun addTranslationV3(commonParam: CommonParam<*>): CommonResponse<TranslationRow?> {
+        return parseRealParam(commonParam, CommitTranslationRowParam::class.java)?.let { realParam ->
+            realParam.projectId?.let { projectId ->
+                realParam.translationKey?.let { translationKey ->
+                    realParam.translations?.let { translationList ->
+                        val queryTranslationList = mTranslationDao.queryTranslationByKey(translationKey, projectId)
+                        if (queryTranslationList.isNotEmpty()) {//key已存在
+                            if (realParam.forceAdd == true) {
+                                println("${translationKey}已存在,强制更新")
+
+                                mTranslationDao.batchImportTranslation(translationList, getModule(projectId)?.moduleId ?: 0)
+                                CommonResponse(200, "", null)
+                            } else {
+                                println("${translationKey}已存在,非强制更新，break")
+                                CommonResponse(-1, "key已存在", TranslationRow(translationKey, queryTranslationList))
+                            }
+                        } else {
+                            println("${translationKey}不存在，执行插入")
+                            val optSuccess = mTranslationDao.batchImportTranslation(translationList, getModule(projectId)?.moduleId ?: 0)
+                            if (optSuccess) {
+                                CommonResponse(200, "", null)
+                            } else {
+                                CommonResponse(-1, "数据库错误", null)
+                            }
+                        }
+
+                    } ?: CommonResponse(200, "", null)
+                } ?: CommonResponse(-1, "参数解析错误,key为空", null)
+            } ?: CommonResponse(-1, "参数解析错误,projectId为空", null)
+        } ?: CommonResponse(-1, "参数解析错误", null)
+    }
 
     val addTranslationSB = java.lang.StringBuilder()
     fun addTranslationsV2(commonParam: CommonParam<*>): CommonResponse<List<Translation>> {

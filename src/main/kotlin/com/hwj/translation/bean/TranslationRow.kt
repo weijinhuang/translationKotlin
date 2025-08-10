@@ -1,6 +1,6 @@
 package com.hwj.translation.bean
 
-data class TranslationRow(
-    val key: String,
-    val translations: List<Translation>
+open class TranslationRow(
+    val translationKey: String?,
+    open val translations: List<Translation>?
 )

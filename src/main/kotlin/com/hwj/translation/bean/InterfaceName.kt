@@ -30,6 +30,8 @@ const val ADD_PROJECT = "addProject"
 
 const val ADD_TRANSLATION = "addTranslations"
 
+const val ADD_TRANSLATION_V3 = "addTranslationsV3"
+
 const val UPDATE_TRANSLATION = "updateTranslations"
 
 const val TRANSLATE_BY_BAIDU = "translateByBaidu"
