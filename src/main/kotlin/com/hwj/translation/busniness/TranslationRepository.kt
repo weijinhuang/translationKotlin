@@ -1,9 +1,8 @@
 package com.hwj.translation.busniness
 
-import com.hwj.translation.bean.CommonResponse
-import com.hwj.translation.bean.Module
-import com.hwj.translation.bean.Translation
-import com.hwj.translation.bean.TranslationRow
+import com.google.cloud.translate.Translate
+import com.google.cloud.translate.TranslateOptions
+import com.hwj.translation.bean.*
 import com.hwj.translation.bean.param.*
 import com.hwj.translation.dao.TranslationDao
 import com.hwj.translation.util.handleSingleQuotes
@@ -293,6 +292,61 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
             } else {
                 CommonResponse(200, "", null)
             }
+        } ?: CommonResponse(-1, "参数解析出错", null)
+    }
+
+    fun copyTranslation(param: CommonParam<*>): CommonResponse<Void> {
+        return parseRealParam(param, CopyTranslationParam::class.java)?.let { realParam ->
+
+            realParam.targetProjectId?.let { targetProjectId ->
+                realParam.sourceProjectId?.let { sourceProjectId ->
+                    getModule(targetProjectId)?.let { module->
+                        realParam.mSourceTranslationKeyList?.let { sourceKeyList ->
+                            var enTranslationList:List<Translation>? = null
+                            mTranslationDao.getLanguageList(targetProjectId).let { targetProjectLanguageList->
+                                val unHandleLanguageList = mutableListOf<Language>()//源项目没有的翻译
+                                targetProjectLanguageList.forEach { targetLanguage->
+                                    mTranslationDao.queryTranslationByLanguage(targetLanguage.languageId!!,sourceProjectId).let { sourceTranslationOfLanguageList->
+                                        if(targetLanguage.languageName == "en"){
+                                            enTranslationList = sourceTranslationOfLanguageList
+                                        }
+                                        if(sourceTranslationOfLanguageList.isEmpty()){
+                                            unHandleLanguageList.add(targetLanguage)
+                                        }else{
+                                            sourceTranslationOfLanguageList.forEach { translation ->
+                                                translation.languageId = targetLanguage.languageId
+                                                translation.moduleId = module.moduleId
+                                                translation.projectId = targetProjectId
+                                                translation.translationId = null
+                                            }
+                                            mTranslationDao.batchImportTranslation(sourceTranslationOfLanguageList,module.moduleId)
+                                        }
+                                    }
+
+                                }
+                                if(unHandleLanguageList.isNotEmpty()){
+                                    enTranslationList?.let { enTranslationList->
+                                        val translateService = TranslateOptions.getDefaultInstance().service
+                                        enTranslationList.forEach { translation->
+                                            val translateResult =
+                                                translateService.translate(
+                                                    translation.translationContent,
+                                                    Translate.TranslateOption.sourceLanguage("en"),
+//                                                    Translate.TranslateOption.targetLanguage(realParam.),
+                                                    Translate.TranslateOption.format("text")
+                                                )
+                                            println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+
+                    CommonResponse(200, "", null)
+                } ?: CommonResponse(-1, "参数解析出错,缺少目标项目Id", null)
+            } ?: CommonResponse(-1, "参数解析出错,缺少目标项目Id", null)
         } ?: CommonResponse(-1, "参数解析出错", null)
     }
 }

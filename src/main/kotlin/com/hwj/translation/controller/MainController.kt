@@ -108,6 +108,7 @@ class MainController {
             ADD_LANGUAGE -> mLanguageRepository.addLanguagesV2(param)
             UPDATE_LANGUAGE -> mLanguageRepository.updateLanguageV2(param)
 
+//            COPY_TRANSLATION -> mTranslationRepository.copyTranslation(param)
             ADD_TRANSLATION_V3 -> mTranslationRepository.addTranslationV3(param)
             BATCH_ADD_TRANSLATION -> mTranslationRepository.batchImportTranslation(param)
             CHECK_TRANSLATION_kEY -> mTranslationRepository.checkTranslationByKeyInProject(param)
@@ -273,6 +274,113 @@ class MainController {
         } else {
             return exportExcel(exportTranslationParam)
         }
+    }
+
+    fun exportExcelOfKey(param:ExportTranslationParam):ResponseEntity<ByteArray>{
+        log(mRequest?.remoteAddr, "exportExcel")
+        val mainProjectId = param.projectIdList.first()
+
+        val mainLanguageList = mTranslationDao.getLanguageList(mainProjectId)
+        val subLanguageList = mutableListOf<Language>()
+        if (param.projectIdList.size > 1) {
+            for (i in 1 until param.projectIdList.size) {
+                subLanguageList.addAll(mTranslationDao.getLanguageList(param.projectIdList[i]))
+            }
+        }
+        if (mainLanguageList.isNotEmpty()) {
+            //创建zip目录
+            val currentDir = System.getProperty("user.dir")
+            println("当前目录：$currentDir")
+            val cacheDir = File("$currentDir/cache")
+            if (cacheDir.exists()) {
+                cacheDir.listFiles()?.forEach {
+                    deleteCache(it)
+                }
+            } else {
+                cacheDir.mkdirs()
+            }
+
+
+            val keyLanguageContentMap: HashMap<String, HashMap<Int, String>> = HashMap()
+
+            var sortTranslationList: MutableList<Translation>? = null
+
+            //分语言导出
+            for (language in mainLanguageList) {
+                val mainTranslationList: List<Translation> = mTranslationDao.queryTranslationByLanguage(language.languageId ?: 0, language.projectId ?: "")
+                if (sortTranslationList == null) {
+                    sortTranslationList = mainTranslationList.toMutableList()
+                }
+                mainTranslationList.forEach { translation ->
+                    parseTranslationToMap(translation.languageId ?: 0, translation, keyLanguageContentMap)
+                }
+
+                subLanguageList.forEach { subLanguage ->
+                    if (subLanguage.languageName == language.languageName) {
+                        val subTranslationList = mTranslationDao.queryTranslationByLanguage(subLanguage.languageId ?: 0, subLanguage.projectId ?: "")
+                        subTranslationList.forEach { translation ->
+                            parseTranslationToMap(language.languageId ?: 0, translation, keyLanguageContentMap)
+                        }
+                    }
+                }
+            }
+
+            sortTranslationList?.sortByDescending {
+                it.translationId
+            }
+
+            val fileDir = "$currentDir/files"
+            File(fileDir).let { files ->
+                if (files.exists()) {
+                    files.listFiles()?.forEach {
+                        deleteCache(it)
+                    }
+                } else {
+                    files.mkdirs()
+                }
+            }
+
+            workbook {
+                sheet {
+                    row {
+                        cell("Key")
+                        mainLanguageList.forEach { language ->
+                            cell("${language.languageName}(${language.languageDes})")
+                        }
+                    }
+                    sortTranslationList?.let { sortTranslationList ->
+                        sortTranslationList.forEach { sortTranslation ->
+                            sortTranslation.translationKey?.let { translationKey ->
+                                row {
+                                    cell(translationKey)
+                                    mainLanguageList.forEach { language ->
+                                        cell(keyLanguageContentMap[translationKey]?.get(language.languageId ?: 0) ?: "")
+                                    }
+                                }
+                            }
+
+                        }
+
+                    }
+//                    keyLanguageContentMap.keys.forEach { translationKey ->
+//                        row {
+//                            cell(translationKey)
+//                            mainLanguageList.forEach { language ->
+//                                cell(keyLanguageContentMap[translationKey]?.get(language.languageId ?: 0) ?: "")
+//                            }
+//                        }
+//                    }
+                }
+            }.write("$fileDir/$mainProjectId.xlsx")
+
+            println("合并excel完毕：$fileDir/$mainProjectId.xlsx")
+            val readBytes = File("$fileDir/$mainProjectId.xlsx").readBytes()
+            val headers = HttpHeaders()
+            headers.setContentDispositionFormData("attachment", "$mainProjectId.xlsx")
+            headers.contentType = MediaType.APPLICATION_OCTET_STREAM
+            return ResponseEntity.ok().headers(headers).contentLength(readBytes.size.toLong()).body(readBytes)
+        }
+        return ResponseEntity.ok().body(ByteArray(0))
     }
 
     fun exportExcel(param: ExportTranslationParam): ResponseEntity<ByteArray> {
