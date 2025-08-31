@@ -1,12 +1,12 @@
 package com.hwj.translation.bean.param
 
 import com.hwj.translation.bean.Translation
-import com.hwj.translation.bean.TranslationRow
 
 class CommitTranslationRowParam(){
-    var forceAdd: Boolean? = false
+    var action: String? = "ADD" //ADD UPDATE
     val projectId: String? = null
     val moduleId: Int? = null
+    val oldTranslationKey:String? = null //修改key之后，旧key
     val translationKey: String? = null
     val translations: List<Translation>? = null
 }

@@ -79,27 +79,34 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
             realParam.projectId?.let { projectId ->
                 realParam.translationKey?.let { translationKey ->
                     realParam.translations?.let { translationList ->
-                        val queryTranslationList = mTranslationDao.queryTranslationByKey(translationKey, projectId)
-                        if (queryTranslationList.isNotEmpty()) {//key已存在
-                            if (realParam.forceAdd == true) {
-                                println("${translationKey}已存在,强制更新")
+                        val module = getModule(projectId)
 
-                                mTranslationDao.batchImportTranslation(translationList, getModule(projectId)?.moduleId ?: 0)
-                                CommonResponse(200, "", null)
-                            } else {
-                                println("${translationKey}已存在,非强制更新，break")
+                        if (realParam.action == "ADD") {
+                            val queryTranslationList = mTranslationDao.queryTranslationByKey(translationKey, projectId)
+                            if (queryTranslationList.isNotEmpty()) {//key已存在
                                 CommonResponse(-1, "key已存在", TranslationRow(translationKey, queryTranslationList))
+                            }else{
+                                val optSuccess = mTranslationDao.batchImportTranslation(translationList, module?.moduleId ?: 0)
+                                if (optSuccess) {
+                                    CommonResponse(200, "", null)
+                                } else {
+                                    CommonResponse(-1, "数据库错误", null)
+                                }
                             }
-                        } else {
-                            println("${translationKey}不存在，执行插入")
-                            val optSuccess = mTranslationDao.batchImportTranslation(translationList, getModule(projectId)?.moduleId ?: 0)
-                            if (optSuccess) {
-                                CommonResponse(200, "", null)
+                        } else {//更新
+                            val conflictTranslationList = realParam.oldTranslationKey?.let { mTranslationDao.queryTranslationByKey(realParam.oldTranslationKey, projectId) } ?: emptyList()
+                            if (conflictTranslationList.isEmpty()) {//key没有变化或者没有冲突
+                                translationList.forEach { it.translationKey = translationKey }
+                                val optSuccess = mTranslationDao.batchImportTranslation(translationList, module?.moduleId ?: 0)
+                                if (optSuccess) {
+                                    CommonResponse(200, "", null)
+                                } else {
+                                    CommonResponse(-1, "数据库错误", null)
+                                }
                             } else {
-                                CommonResponse(-1, "数据库错误", null)
+                                CommonResponse(-1, "key已存在", TranslationRow(translationKey, conflictTranslationList))
                             }
                         }
-
                     } ?: CommonResponse(200, "", null)
                 } ?: CommonResponse(-1, "参数解析错误,key为空", null)
             } ?: CommonResponse(-1, "参数解析错误,projectId为空", null)
@@ -300,34 +307,34 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
 
             realParam.targetProjectId?.let { targetProjectId ->
                 realParam.sourceProjectId?.let { sourceProjectId ->
-                    getModule(targetProjectId)?.let { module->
+                    getModule(targetProjectId)?.let { module ->
                         realParam.mSourceTranslationKeyList?.let { sourceKeyList ->
-                            var enTranslationList:List<Translation>? = null
-                            mTranslationDao.getLanguageList(targetProjectId).let { targetProjectLanguageList->
+                            var enTranslationList: List<Translation>? = null
+                            mTranslationDao.getLanguageList(targetProjectId).let { targetProjectLanguageList ->
                                 val unHandleLanguageList = mutableListOf<Language>()//源项目没有的翻译
-                                targetProjectLanguageList.forEach { targetLanguage->
-                                    mTranslationDao.queryTranslationByLanguage(targetLanguage.languageId!!,sourceProjectId).let { sourceTranslationOfLanguageList->
-                                        if(targetLanguage.languageName == "en"){
+                                targetProjectLanguageList.forEach { targetLanguage ->
+                                    mTranslationDao.queryTranslationByLanguage(targetLanguage.languageId!!, sourceProjectId).let { sourceTranslationOfLanguageList ->
+                                        if (targetLanguage.languageName == "en") {
                                             enTranslationList = sourceTranslationOfLanguageList
                                         }
-                                        if(sourceTranslationOfLanguageList.isEmpty()){
+                                        if (sourceTranslationOfLanguageList.isEmpty()) {
                                             unHandleLanguageList.add(targetLanguage)
-                                        }else{
+                                        } else {
                                             sourceTranslationOfLanguageList.forEach { translation ->
                                                 translation.languageId = targetLanguage.languageId
                                                 translation.moduleId = module.moduleId
                                                 translation.projectId = targetProjectId
                                                 translation.translationId = null
                                             }
-                                            mTranslationDao.batchImportTranslation(sourceTranslationOfLanguageList,module.moduleId)
+                                            mTranslationDao.batchImportTranslation(sourceTranslationOfLanguageList, module.moduleId)
                                         }
                                     }
 
                                 }
-                                if(unHandleLanguageList.isNotEmpty()){
-                                    enTranslationList?.let { enTranslationList->
+                                if (unHandleLanguageList.isNotEmpty()) {
+                                    enTranslationList?.let { enTranslationList ->
                                         val translateService = TranslateOptions.getDefaultInstance().service
-                                        enTranslationList.forEach { translation->
+                                        enTranslationList.forEach { translation ->
                                             val translateResult =
                                                 translateService.translate(
                                                     translation.translationContent,

@@ -24,6 +24,7 @@ class LanguageRepository(translationDao: TranslationDao) : BaseRepository(transl
                     languageList.addAll(languageListOfProject)
                 }
             }
+            languageList.sortWith{o1,o2->( o2.languageOrder?:0) - (o1.languageOrder?:0)}
         }
         return CommonResponse(200, "", languageList)
     }
