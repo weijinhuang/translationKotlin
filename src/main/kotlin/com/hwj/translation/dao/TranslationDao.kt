@@ -3,6 +3,7 @@ package com.hwj.translation.dao
 import com.hwj.translation.bean.Language
 import com.hwj.translation.bean.Project
 import com.hwj.translation.bean.Translation
+import com.hwj.translation.bean.TranslationRow
 
 interface TranslationDao {
 
@@ -66,5 +67,9 @@ interface TranslationDao {
 
     fun queryModuleByName(moduleName: String, projectId: String): List<com.hwj.translation.bean.Module>
     fun queryModuleById(projectId: String): List<com.hwj.translation.bean.Module>
+
+    /**Translation Pagination*/
+    fun getTranslationRowsPaginated(projectId: String, offset: Int, limit: Int): List<TranslationRow>
+    fun getTotalTranslationKeysCount(projectId: String): Long
 
 }
