@@ -85,7 +85,10 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                             val queryTranslationList = mTranslationDao.queryTranslationByKey(translationKey, projectId)
                             if (queryTranslationList.isNotEmpty()) {//key已存在
                                 CommonResponse(-1, "key已存在", TranslationRow(translationKey, queryTranslationList))
-                            }else{
+                            } else {
+                                translationList.forEach {
+                                    it.translationKey = translationKey
+                                }
                                 val optSuccess = mTranslationDao.batchImportTranslation(translationList, module?.moduleId ?: 0)
                                 if (optSuccess) {
                                     CommonResponse(200, "", null)
@@ -94,9 +97,15 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                                 }
                             }
                         } else {//更新
-                            val conflictTranslationList = realParam.oldTranslationKey?.let { mTranslationDao.queryTranslationByKey(realParam.oldTranslationKey, projectId) } ?: emptyList()
+                            val conflictTranslationList = realParam.newTranslationKey?.let { newKey ->
+                                if (newKey == translationKey) {
+                                    emptyList()
+                                } else {
+                                    mTranslationDao.queryTranslationByKey(newKey, projectId)
+                                }
+                            } ?: emptyList()
                             if (conflictTranslationList.isEmpty()) {//key没有变化或者没有冲突
-                                translationList.forEach { it.translationKey = translationKey }
+                                translationList.forEach { it.translationKey = realParam.translationKey }
                                 val optSuccess = mTranslationDao.batchImportTranslation(translationList, module?.moduleId ?: 0)
                                 if (optSuccess) {
                                     CommonResponse(200, "", null)
