@@ -46,3 +46,7 @@ const val DELETE_MODULE = "deleteModule"
 
 const val MERGE_TRANSLATION = "mergeTranslation"
 
+const val GET_TRANSLATION_ROWS_PAGINATED = "getTranslationRowsPaginated"
+
+const val SEARCH_TRANSLATIONS_BY_CONTENT = "searchTranslationsByContent"
+

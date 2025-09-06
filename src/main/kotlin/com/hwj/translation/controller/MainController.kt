@@ -34,12 +34,12 @@ import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
 
+const val proxyHost = "127.0.0.1"
+const val proxyPort = "7897"
 
 @RestController
 class MainController {
 
-    val proxyHost = "127.0.0.1"
-    val proxyPort = "7897"
 
     @Autowired
     private lateinit var mTranslationDao: TranslationDaoImpl
@@ -108,12 +108,14 @@ class MainController {
             ADD_LANGUAGE -> mLanguageRepository.addLanguagesV2(param)
             UPDATE_LANGUAGE -> mLanguageRepository.updateLanguageV2(param)
 
-//            COPY_TRANSLATION -> mTranslationRepository.copyTranslation(param)
+            COPY_TRANSLATION -> mTranslationRepository.copyTranslation(param)
             ADD_TRANSLATION_V3 -> mTranslationRepository.addTranslationV3(param)
             BATCH_ADD_TRANSLATION -> mTranslationRepository.batchImportTranslation(param)
             CHECK_TRANSLATION_kEY -> mTranslationRepository.checkTranslationByKeyInProject(param)
             GET_ALL_TRANSLATION -> mTranslationRepository.getTranslationListV2(param)
             GET_ALL_TRANSLATION_V3 -> mTranslationRepository.getTranslationListV3(param)
+            GET_TRANSLATION_ROWS_PAGINATED -> mTranslationRepository.getTranslationRowsPaginated(param)
+            SEARCH_TRANSLATIONS_BY_CONTENT -> mTranslationRepository.searchTranslationsByContent(param)
             DELETE_TRANSLATION_BY_KEY -> mTranslationRepository.deleteTranslationByTranslationKeyV2(param)
             ADD_TRANSLATION -> mTranslationRepository.addTranslationsV2(param)
             UPDATE_TRANSLATION -> mTranslationRepository.updateTranslationsV2(param)
