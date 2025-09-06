@@ -720,4 +720,89 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
             }
         } ?: CommonResponse(-1, "参数解析错误", null)
     }
+
+    /**
+     * 根据内容搜索项目下的翻译
+     * @param param 包含搜索参数的CommonParam
+     * @return 搜索结果，包含匹配的TranslationRow列表
+     */
+    fun searchTranslationsByContent(param: CommonParam<*>): CommonResponse<List<TranslationRow>> {
+        return parseRealParam(param, SearchTranslationByContentParam::class.java)?.let { realParam ->
+            try {
+                val startTime = System.currentTimeMillis()
+                
+                // 验证参数
+                if (realParam.projectId.isBlank()) {
+                    return CommonResponse(-1, "项目ID不能为空", emptyList())
+                }
+                
+                if (realParam.targetTranslationContent.isBlank()) {
+                    return CommonResponse(-1, "搜索内容不能为空", emptyList())
+                }
+                
+                val translationRows = if (realParam.languageId == null || realParam.languageId < 0) {
+                    // languageId为null或负值，将targetTranslationContent当作translationKey进行搜索
+                    println("使用translationKey搜索模式：key='${realParam.targetTranslationContent}'")
+                    
+                    // 直接按translationKey搜索
+                    val matchingKeys = listOf(realParam.targetTranslationContent)
+                    val foundRows = mTranslationDao.getTranslationRowsByKeys(
+                        realParam.projectId,
+                        matchingKeys
+                    )
+                    
+                    val endTime = System.currentTimeMillis()
+                    if (foundRows.isEmpty()) {
+                        println("translationKey搜索完成：projectId=${realParam.projectId}, key='${realParam.targetTranslationContent}', 未找到匹配结果, 查询耗时：${endTime - startTime}ms")
+                    } else {
+                        println("translationKey搜索完成：projectId=${realParam.projectId}, key='${realParam.targetTranslationContent}', 返回${foundRows.size}个TranslationRow, 查询耗时：${endTime - startTime}ms")
+                    }
+                    
+                    foundRows
+                } else {
+                    // 正常的内容搜索模式
+                    println("使用内容搜索模式：content='${realParam.targetTranslationContent}', languageId=${realParam.languageId}")
+                    
+                    // 第一步：根据内容搜索匹配的translationKey列表
+                    val matchingKeys = mTranslationDao.searchTranslationKeysByContent(
+                        realParam.projectId,
+                        realParam.targetTranslationContent,
+                        realParam.languageId
+                    )
+                    
+                    if (matchingKeys.isEmpty()) {
+                        val endTime = System.currentTimeMillis()
+                        println("内容搜索完成：projectId=${realParam.projectId}, content='${realParam.targetTranslationContent}', languageId=${realParam.languageId}, 未找到匹配结果, 查询耗时：${endTime - startTime}ms")
+                        emptyList()
+                    } else {
+                        // 第二步：获取这些key对应的所有语言翻译
+                        val foundRows = mTranslationDao.getTranslationRowsByKeys(
+                            realParam.projectId,
+                            matchingKeys
+                        )
+                        
+                        val endTime = System.currentTimeMillis()
+                        println("内容搜索完成：projectId=${realParam.projectId}, content='${realParam.targetTranslationContent}', languageId=${realParam.languageId}, 找到${matchingKeys.size}个匹配的key, 返回${foundRows.size}个TranslationRow, 查询耗时：${endTime - startTime}ms")
+                        
+                        foundRows
+                    }
+                }
+                
+                val responseMessage = if (translationRows.isEmpty()) {
+                    if (realParam.languageId == null || realParam.languageId < 0) {
+                        "未找到匹配的translationKey"
+                    } else {
+                        "未找到匹配的翻译"
+                    }
+                } else {
+                    "搜索成功"
+                }
+                
+                CommonResponse(200, responseMessage, translationRows)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                CommonResponse(-1, "搜索失败：${e.message}", emptyList())
+            }
+        } ?: CommonResponse(-1, "参数解析错误", emptyList())
+    }
 }

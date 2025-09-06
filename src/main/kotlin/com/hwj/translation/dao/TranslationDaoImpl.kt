@@ -695,4 +695,77 @@ class TranslationDaoImpl : TranslationDao {
             0L
         }
     }
+
+    /**-------Translation Search by Content---------*/
+    override fun searchTranslationKeysByContent(projectId: String, targetTranslationContent: String, languageId: Int): List<String> {
+        val sqlStr = """
+            SELECT DISTINCT t.translationKey
+            FROM tb_translation t
+            WHERE t.projectId = ? 
+            AND t.languageId = ? 
+            AND t.translationContent LIKE ?
+            ORDER BY t.translationKey
+        """.trimIndent()
+        
+        println("sqlStr -> $sqlStr")
+        
+        return try {
+            val searchPattern = "%$targetTranslationContent%"
+            mJdbcTemplate.queryForList(
+                sqlStr,
+                String::class.java,
+                projectId,
+                languageId,
+                searchPattern
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+    
+    override fun getTranslationRowsByKeys(projectId: String, translationKeys: List<String>): List<TranslationRow> {
+        if (translationKeys.isEmpty()) {
+            return emptyList()
+        }
+        
+        val placeholders = translationKeys.joinToString(",") { "?" }
+        val sqlStr = """
+            SELECT * FROM tb_translation 
+            WHERE projectId = ? AND translationKey IN ($placeholders)
+            ORDER BY translationKey, languageId
+        """.trimIndent()
+        
+        println("sqlStr -> $sqlStr")
+        
+        val params = mutableListOf<Any>().apply {
+            add(projectId)
+            addAll(translationKeys)
+        }
+        
+        return try {
+            val allTranslations = mJdbcTemplate.query(
+                sqlStr,
+                PreparedStatementSetter { ps ->
+                    params.forEachIndexed { index, param ->
+                        ps.setObject(index + 1, param)
+                    }
+                },
+                BeanPropertyRowMapper(Translation::class.java)
+            )
+            
+            // 按translationKey分组
+            val translationMap = allTranslations.groupBy { it.translationKey ?: "" }
+            
+            // 构建TranslationRow列表，保持原始顺序
+            translationKeys.mapNotNull { key ->
+                translationMap[key]?.let { translations ->
+                    TranslationRow(key, translations)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
 }

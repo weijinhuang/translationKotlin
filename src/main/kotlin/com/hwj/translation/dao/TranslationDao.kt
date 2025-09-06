@@ -72,4 +72,8 @@ interface TranslationDao {
     fun getTranslationRowsPaginated(projectId: String, offset: Int, limit: Int): List<TranslationRow>
     fun getTotalTranslationKeysCount(projectId: String): Long
 
+    /**Translation Search by Content*/
+    fun searchTranslationKeysByContent(projectId: String, targetTranslationContent: String, languageId: Int): List<String>
+    fun getTranslationRowsByKeys(projectId: String, translationKeys: List<String>): List<TranslationRow>
+
 }
