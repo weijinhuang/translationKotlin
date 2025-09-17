@@ -34,9 +34,9 @@ import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
 
-const val proxyHost = "127.0.0.1"
-const val proxyPort = "7897"
 
+const val proxyHost = "127.0.0.1"
+const val proxyPort = "7890"
 @RestController
 class MainController {
 
@@ -151,6 +151,7 @@ class MainController {
                     println("检测到语言:$sourceLanguage")
                 }
                 return try {
+                    println("开始翻译：sourceLanguage:$sourceLanguage targetLanguage:${realParam.targetLanguage} content:${realParam.content}")
                     val translateResult =
                         translateService.translate(
                             realParam.content,
@@ -886,11 +887,11 @@ class MainController {
     @PostMapping("/upload-translations")
     fun uploadTranslations(
         @RequestParam("file") file: MultipartFile
-    ): CommonResponse<List<SimpleTranslationRow>> {
+    ): CommonResponse<out ParseTranslationResult> {
         val startTime = System.currentTimeMillis()
         val filename = file.originalFilename ?: "unknown"
         val response = if (file.isEmpty) {
-            CommonResponse(-1, "文件为空", emptyList())
+            CommonResponse(-1, "文件为空", null)
         } else {
             try {
                 println("接收到文件：$filename")
@@ -901,10 +902,10 @@ class MainController {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                CommonResponse(-1, e.message, emptyList())
+                CommonResponse(-1, e.message, null)
             }
         }
-        println("解析$filename 翻译数量：${response.data?.size} 花费时间：ms${System.currentTimeMillis() - startTime}")
+        println("解析$filename 翻译数量：${response.data?.translationRowList?.size} 花费时间：ms${System.currentTimeMillis() - startTime}")
         return response
     }
 

@@ -219,9 +219,10 @@ class TranslationDaoImpl : TranslationDao {
     }
 
     override fun batchImportTranslation(translations: List<Translation>, defaultModuleId: Int): Boolean {
-        val SQL_UPSERT = "INSERT INTO tb_translation (translationKey, languageId, translationContent,projectId, moduleId, comment, hide, referto) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE translationContent = ?,comment = ?,hide = ?, referto = ?"
+        val SQL_UPSERT =
+            "INSERT INTO tb_translation (translationKey, languageId, translationContent,projectId, moduleId, comment, hide, referto) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE translationContent = ?,comment = ?,hide = ?, referto = ?"
         var batchSize = 1000 // 每批处理量
-        if(batchSize > translations.size){
+        if (batchSize > translations.size) {
             batchSize = translations.size
         }
         val startTime = System.currentTimeMillis()
@@ -233,19 +234,19 @@ class TranslationDaoImpl : TranslationDao {
                     t.translationKey?.let { translationKey ->
                         t.languageId?.let { languageId ->
                             t.projectId?.let { projectId ->
-                                    ps.setString(1, translationKey)
-                                    ps.setInt(2, languageId)
-                                    ps.setString(3, t.translationContent)
-                                    ps.setString(4, t.projectId)
-                                    ps.setInt(5, t.moduleId ?: defaultModuleId)
-                                    ps.setString(6, t.comment)
-                                    ps.setInt(7, t.hide)
-                                    ps.setString(8, t.referto)
-                                    // 更新字段 (VALUES()获取传入值)
-                                    ps.setString(9, t.translationContent)
-                                    ps.setString(10, t.comment)
-                                    ps.setInt(11, t.hide)
-                                    ps.setString(12, t.referto)
+                                ps.setString(1, translationKey)
+                                ps.setInt(2, languageId)
+                                ps.setString(3, t.translationContent)
+                                ps.setString(4, t.projectId)
+                                ps.setInt(5, t.moduleId ?: defaultModuleId)
+                                ps.setString(6, t.comment)
+                                ps.setInt(7, t.hide)
+                                ps.setString(8, t.referto)
+                                // 更新字段 (VALUES()获取传入值)
+                                ps.setString(9, t.translationContent)
+                                ps.setString(10, t.comment)
+                                ps.setInt(11, t.hide)
+                                ps.setString(12, t.referto)
                             }
                         }
                     }
@@ -634,9 +635,9 @@ class TranslationDaoImpl : TranslationDao {
             ORDER BY t.translationKey
             LIMIT ? OFFSET ?
         """.trimIndent()
-        
+
         println("sqlStr -> $sqlStr")
-        
+
         // 首先获取分页的translationKey列表
         val translationKeys = mJdbcTemplate.queryForList(
             sqlStr,
@@ -645,11 +646,11 @@ class TranslationDaoImpl : TranslationDao {
             limit,
             offset
         )
-        
+
         if (translationKeys.isEmpty()) {
             return emptyList()
         }
-        
+
         // 然后获取这些key对应的所有translation记录
         val placeholders = translationKeys.joinToString(",") { "?" }
         val detailSql = """
@@ -657,12 +658,12 @@ class TranslationDaoImpl : TranslationDao {
             WHERE projectId = ? AND translationKey IN ($placeholders)
             ORDER BY translationKey, languageId
         """.trimIndent()
-        
+
         val params = mutableListOf<Any>().apply {
             add(projectId)
             addAll(translationKeys)
         }
-        
+
         val allTranslations = mJdbcTemplate.query(
             detailSql,
             PreparedStatementSetter { ps ->
@@ -672,10 +673,10 @@ class TranslationDaoImpl : TranslationDao {
             },
             BeanPropertyRowMapper(Translation::class.java)
         )
-        
+
         // 按translationKey分组
         val translationMap = allTranslations.groupBy { it.translationKey ?: "" }
-        
+
         // 构建TranslationRow列表
         return translationKeys.mapNotNull { key ->
             translationMap[key]?.let { translations ->
@@ -683,11 +684,11 @@ class TranslationDaoImpl : TranslationDao {
             }
         }
     }
-    
+
     override fun getTotalTranslationKeysCount(projectId: String): Long {
         val sqlStr = "SELECT COUNT(DISTINCT translationKey) FROM tb_translation WHERE projectId = ?"
         println("sqlStr -> $sqlStr")
-        
+
         return try {
             mJdbcTemplate.queryForObject(sqlStr, Long::class.java, projectId) ?: 0L
         } catch (e: Exception) {
@@ -706,9 +707,9 @@ class TranslationDaoImpl : TranslationDao {
             AND t.translationContent LIKE ?
             ORDER BY t.translationKey
         """.trimIndent()
-        
+
         println("sqlStr -> $sqlStr")
-        
+
         return try {
             val searchPattern = "%$targetTranslationContent%"
             mJdbcTemplate.queryForList(
@@ -723,26 +724,26 @@ class TranslationDaoImpl : TranslationDao {
             emptyList()
         }
     }
-    
+
     override fun getTranslationRowsByKeys(projectId: String, translationKeys: List<String>): List<TranslationRow> {
         if (translationKeys.isEmpty()) {
             return emptyList()
         }
-        
+
         val placeholders = translationKeys.joinToString(",") { "?" }
         val sqlStr = """
             SELECT * FROM tb_translation 
             WHERE projectId = ? AND translationKey IN ($placeholders)
             ORDER BY translationKey, languageId
         """.trimIndent()
-        
+
         println("sqlStr -> $sqlStr")
-        
+
         val params = mutableListOf<Any>().apply {
             add(projectId)
             addAll(translationKeys)
         }
-        
+
         return try {
             val allTranslations = mJdbcTemplate.query(
                 sqlStr,
@@ -753,10 +754,10 @@ class TranslationDaoImpl : TranslationDao {
                 },
                 BeanPropertyRowMapper(Translation::class.java)
             )
-            
+
             // 按translationKey分组
             val translationMap = allTranslations.groupBy { it.translationKey ?: "" }
-            
+
             // 构建TranslationRow列表，保持原始顺序
             translationKeys.mapNotNull { key ->
                 translationMap[key]?.let { translations ->

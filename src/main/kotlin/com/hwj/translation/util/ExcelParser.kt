@@ -1,5 +1,6 @@
 package com.hwj.translation.util
 
+import com.hwj.translation.bean.ParseTranslationResult
 import com.hwj.translation.bean.SimpleTranslationRow
 import com.hwj.translation.bean.TranslationParseSimpleInfo
 import com.hwj.translation.bean.TranslationRow
@@ -9,7 +10,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import java.io.InputStream
 
 class ExcelParser : TranslationParser {
-    override fun parse(excelContentStr: String, inputStream: InputStream): List<SimpleTranslationRow> {
+    override fun parse(excelContentStr: String, inputStream: InputStream): ParseTranslationResult {
         val workbook: Workbook = XSSFWorkbook(inputStream)
         val sheet = workbook.getSheetAt(0)
         val rows = mutableListOf<SimpleTranslationRow>()
@@ -46,6 +47,9 @@ class ExcelParser : TranslationParser {
         }
 
         workbook.close()
-        return rows
+        return ParseTranslationResult().apply {
+            languageTitleList = languages
+            translationRowList = rows
+        }
     }
 }

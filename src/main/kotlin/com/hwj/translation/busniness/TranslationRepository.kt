@@ -107,13 +107,26 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                                 }
                             } ?: emptyList()
                             if (conflictTranslationList.isEmpty()) {//key没有变化或者没有冲突
-                                translationList.forEach { it.translationKey = realParam.translationKey }
-                                val optSuccess = mTranslationDao.batchImportTranslation(translationList, module?.moduleId ?: 0)
-                                if (optSuccess) {
+                                try {
+                                    translationList.forEach {
+                                        it.translationKey = if(realParam.newTranslationKey.isNullOrEmpty()) realParam.translationKey else realParam.newTranslationKey
+                                        if(it.translationId == null){
+                                            it.moduleId =  module?.moduleId?:0
+                                            mTranslationDao.addTranslation(it)
+                                        }else {
+                                            mTranslationDao.updateTranslation(it)
+                                        }
+                                    }
                                     CommonResponse(200, "", null)
-                                } else {
-                                    CommonResponse(-1, "数据库错误", null)
+                                } catch (e: Exception) {
+                                    CommonResponse(-1, e.message, null)
                                 }
+//                                val optSuccess = mTranslationDao.batchImportTranslation(translationList, module?.moduleId ?: 0)
+//                                if (optSuccess) {
+//
+//                                } else {
+//
+//                                }
                             } else {
                                 CommonResponse(-1, "key已存在", TranslationRow(translationKey, conflictTranslationList))
                             }
@@ -321,7 +334,7 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                 realParam.sourceProjectId?.let { sourceProjectId ->
                     println("源项目：$sourceProjectId")
                     getModule(targetProjectId)?.let { module ->
-                        val sourceTranslationKeyList = realParam.mSourceTranslationKeyList ?:listOf(
+                        val sourceTranslationKeyList = realParam.mSourceTranslationKeyList ?: listOf(
                             "hs_device_offline_time",
                             "hs_login_failed",
                             "hs_language_zh",
@@ -691,23 +704,23 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
         return parseRealParam(param, PaginatedTranslationParam::class.java)?.let { realParam ->
             try {
                 val startTime = System.currentTimeMillis()
-                
+
                 // 计算偏移量
                 val offset = realParam.page * realParam.size
-                
+
                 // 获取分页数据
                 val translationRows = mTranslationDao.getTranslationRowsPaginated(
                     realParam.projectId,
                     offset,
                     realParam.size
                 )
-                
+
                 // 获取总记录数
                 val totalElements = mTranslationDao.getTotalTranslationKeysCount(realParam.projectId)
-                
+
                 // 计算总页数
                 val totalPages = ((totalElements + realParam.size - 1) / realParam.size).toInt()
-                
+
                 // 构建分页响应
                 val paginatedResponse = PaginatedResponse(
                     content = translationRows,
@@ -718,10 +731,10 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                     hasNext = realParam.page < totalPages - 1,
                     hasPrevious = realParam.page > 0
                 )
-                
+
                 val endTime = System.currentTimeMillis()
                 println("分页查询完成：projectId=${realParam.projectId}, page=${realParam.page}, size=${realParam.size}, totalElements=$totalElements, 查询耗时：${endTime - startTime}ms")
-                
+
                 CommonResponse(200, "查询成功", paginatedResponse)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -739,46 +752,46 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
         return parseRealParam(param, SearchTranslationByContentParam::class.java)?.let { realParam ->
             try {
                 val startTime = System.currentTimeMillis()
-                
+
                 // 验证参数
                 if (realParam.projectId.isBlank()) {
                     return CommonResponse(-1, "项目ID不能为空", emptyList())
                 }
-                
+
                 if (realParam.targetTranslationContent.isBlank()) {
                     return CommonResponse(-1, "搜索内容不能为空", emptyList())
                 }
-                
+
                 val translationRows = if (realParam.languageId == null || realParam.languageId < 0) {
                     // languageId为null或负值，将targetTranslationContent当作translationKey进行搜索
                     println("使用translationKey搜索模式：key='${realParam.targetTranslationContent}'")
-                    
+
                     // 直接按translationKey搜索
                     val matchingKeys = listOf(realParam.targetTranslationContent)
                     val foundRows = mTranslationDao.getTranslationRowsByKeys(
                         realParam.projectId,
                         matchingKeys
                     )
-                    
+
                     val endTime = System.currentTimeMillis()
                     if (foundRows.isEmpty()) {
                         println("translationKey搜索完成：projectId=${realParam.projectId}, key='${realParam.targetTranslationContent}', 未找到匹配结果, 查询耗时：${endTime - startTime}ms")
                     } else {
                         println("translationKey搜索完成：projectId=${realParam.projectId}, key='${realParam.targetTranslationContent}', 返回${foundRows.size}个TranslationRow, 查询耗时：${endTime - startTime}ms")
                     }
-                    
+
                     foundRows
                 } else {
                     // 正常的内容搜索模式
                     println("使用内容搜索模式：content='${realParam.targetTranslationContent}', languageId=${realParam.languageId}")
-                    
+
                     // 第一步：根据内容搜索匹配的translationKey列表
                     val matchingKeys = mTranslationDao.searchTranslationKeysByContent(
                         realParam.projectId,
                         realParam.targetTranslationContent,
                         realParam.languageId
                     )
-                    
+
                     if (matchingKeys.isEmpty()) {
                         val endTime = System.currentTimeMillis()
                         println("内容搜索完成：projectId=${realParam.projectId}, content='${realParam.targetTranslationContent}', languageId=${realParam.languageId}, 未找到匹配结果, 查询耗时：${endTime - startTime}ms")
@@ -789,14 +802,14 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                             realParam.projectId,
                             matchingKeys
                         )
-                        
+
                         val endTime = System.currentTimeMillis()
                         println("内容搜索完成：projectId=${realParam.projectId}, content='${realParam.targetTranslationContent}', languageId=${realParam.languageId}, 找到${matchingKeys.size}个匹配的key, 返回${foundRows.size}个TranslationRow, 查询耗时：${endTime - startTime}ms")
-                        
+
                         foundRows
                     }
                 }
-                
+
                 val responseMessage = if (translationRows.isEmpty()) {
                     if (realParam.languageId == null || realParam.languageId < 0) {
                         "未找到匹配的translationKey"
@@ -806,7 +819,7 @@ class TranslationRepository(translationDao: TranslationDao) : BaseRepository(tra
                 } else {
                     "搜索成功"
                 }
-                
+
                 CommonResponse(200, responseMessage, translationRows)
             } catch (e: Exception) {
                 e.printStackTrace()

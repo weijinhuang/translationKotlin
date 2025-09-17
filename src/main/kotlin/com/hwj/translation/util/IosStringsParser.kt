@@ -1,5 +1,6 @@
 package com.hwj.translation.util
 
+import com.hwj.translation.bean.ParseTranslationResult
 import com.hwj.translation.bean.SimpleTranslationRow
 import com.hwj.translation.bean.TranslationParseSimpleInfo
 import com.hwj.translation.bean.TranslationRow
@@ -12,16 +13,22 @@ class IosStringsParser : TranslationParser {
 //    private val pattern = "\"([^\"]+)\"\\s*=\\s*\"((?:\\\\\"|[^\"])*)\"\\s*;".toRegex()
     private val regex = "\"([^\"]+)\"\\s*=\\s*([^;]+);".toRegex()
 
-    override fun parse(content: String, stream: InputStream): List<SimpleTranslationRow> {
-        val list = regex.findAll(content).mapNotNull { matchResult ->
+    override fun parse(content: String, stream: InputStream): ParseTranslationResult {
+
+        val translationRowList = mutableListOf<SimpleTranslationRow>()
+         regex.findAll(content).mapNotNull { matchResult ->
             if (matchResult.groupValues.size >= 3) {
                 val key = matchResult.groupValues[1]
                 val rawValue = matchResult.groupValues[2]
                 val value = unescapeIosString(rawValue)
-                TranslationParseSimpleInfo(key, value)
-            } else null
-        }.toList()
-        return listOf(SimpleTranslationRow("", list))
+                val translationParseSimpleInfo = TranslationParseSimpleInfo(key, value,"")
+                translationRowList.add(SimpleTranslationRow(key, listOf(translationParseSimpleInfo)))
+            }
+        }
+        return ParseTranslationResult().apply {
+            languageTitleList = listOf("")
+            this.translationRowList =translationRowList
+        }
     }
 
     private fun unescapeIosString(input: String): String {

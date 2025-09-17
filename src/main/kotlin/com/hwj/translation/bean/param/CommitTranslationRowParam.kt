@@ -6,7 +6,7 @@ class CommitTranslationRowParam(){
     var action: String? = "ADD" //ADD UPDATE
     val projectId: String? = null
     val moduleId: Int? = null
-    val oldTranslationKey:String? = null //修改key之后，旧key
+    val newTranslationKey:String? = null //修改key之后，旧key
     val translationKey: String? = null
     val translations: List<Translation>? = null
 }
