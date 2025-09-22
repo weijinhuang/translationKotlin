@@ -50,3 +50,7 @@ const val GET_TRANSLATION_ROWS_PAGINATED = "getTranslationRowsPaginated"
 
 const val SEARCH_TRANSLATIONS_BY_CONTENT = "searchTranslationsByContent"
 
+const val UPSERT_PROJECT_IP = "upsertProjectIp"
+const val DELETE_PROJECT_IP = "deleteProjectIp"
+const val QUERY_PROJECT_IPS = "queryProjectIps"
+

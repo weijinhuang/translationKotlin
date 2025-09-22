@@ -11,6 +11,7 @@ import com.hwj.translation.bean.*
 import com.hwj.translation.bean.param.*
 import com.hwj.translation.busniness.LanguageRepository
 import com.hwj.translation.busniness.ModuleRepository
+import com.hwj.translation.busniness.ProjectIpRepository
 import com.hwj.translation.busniness.ProjectRepository
 import com.hwj.translation.busniness.TranslationRepository
 import com.hwj.translation.dao.TranslationDaoImpl
@@ -36,7 +37,7 @@ import javax.xml.transform.stream.StreamResult
 
 
 const val proxyHost = "127.0.0.1"
-const val proxyPort = "7890"
+const val proxyPort = "7897"
 @RestController
 class MainController {
 
@@ -94,6 +95,8 @@ class MainController {
 
     private val mModuleRepository by lazy { ModuleRepository(mTranslationDao) }
 
+    private val mProjectIpRepository by lazy { ProjectIpRepository(mTranslationDao) }
+
     @CrossOrigin
     @RequestMapping("/translationSystem")
     fun <PARAM, RESPONSE> mainEntrance(@RequestBody param: CommonParam<PARAM>): CommonResponse<RESPONSE?> {
@@ -127,6 +130,10 @@ class MainController {
             GET_ALL_MODULES -> mModuleRepository.getAllModulesV2(param)
             ADD_MODULE -> mModuleRepository.addModuleV2(param)
             DELETE_MODULE -> mModuleRepository.deleteModuleV2(param)
+
+            UPSERT_PROJECT_IP -> mProjectIpRepository.upsertProjectIp(mRequest?.remoteAddr?:"",param)
+            DELETE_PROJECT_IP -> mProjectIpRepository.deleteProjectIpV2(param)
+            QUERY_PROJECT_IPS -> mProjectIpRepository.queryProjectIpsV2(param)
 
             null -> CommonResponse(code = -1, msg = "接口名为空", null)
             else -> CommonResponse(code = 400, msg = "未知接口${param.cmd}", null)

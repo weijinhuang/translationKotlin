@@ -20,10 +20,12 @@ class PaginatedTranslationTest {
     fun testPaginatedQuery() {
         // 1. 创建分页参数
         val paginatedParam = PaginatedTranslationParam(
-            projectId = "your_project_id",  // 替换为实际的项目ID
-            page = 0,       // 第一页（从0开始）
+        ).apply {
+
+            projectId = "your_project_id"  // 替换为实际的项目ID
+            page = 0      // 第一页（从0开始）
             size = 20       // 每页20条记录
-        )
+        }
         
         // 2. 构建通用参数
         val commonParam = CommonParam<PaginatedTranslationParam>().apply {
@@ -98,17 +100,21 @@ class PaginatedTranslationTest {
     fun testDifferentPages() {
         // 查询第二页
         val secondPageParam = PaginatedTranslationParam(
-            projectId = "your_project_id",
-            page = 1,       // 第二页
+
+        ).apply {
+            projectId = "your_project_id"
+            page = 1      // 第二
             size = 20
-        )
+        }
         
         // 查询更小的页面大小
         val smallPageParam = PaginatedTranslationParam(
-            projectId = "your_project_id",
-            page = 0,
-            size = 10       // 每页10条记录
-        )
+
+        ).apply {
+            projectId = "your_project_id"
+            page = 0      // 第二
+            size = 10
+        }
     }
     
     /**
@@ -117,23 +123,29 @@ class PaginatedTranslationTest {
     fun testErrorHandling() {
         // 无效的项目ID
         val invalidProjectParam = PaginatedTranslationParam(
-            projectId = "",  // 空的项目ID
-            page = 0,
+
+        ).apply {
+            projectId = ""
+            page = 0      // 第二
             size = 20
-        )
+        }
         
         // 负数页码（虽然参数验证可能会处理）
         val negativePageParam = PaginatedTranslationParam(
-            projectId = "your_project_id",
-            page = -1,      // 负数页码
+        ).apply {
+
+            projectId = "your_project_id"
+            page = -1     // 负数页码
             size = 20
-        )
+        }
         
         // 过大的页面大小
         val largeSizeParam = PaginatedTranslationParam(
-            projectId = "your_project_id",
-            page = 0,
+        ).apply {
+
+            projectId = "your_project_id"
+            page = 0
             size = 1000     // 过大的页面大小
-        )
+        }
     }
 }

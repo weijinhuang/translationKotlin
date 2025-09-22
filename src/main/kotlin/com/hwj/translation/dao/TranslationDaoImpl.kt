@@ -769,4 +769,134 @@ class TranslationDaoImpl : TranslationDao {
             emptyList()
         }
     }
+
+    /**-------ProjectIp CRUD Operations---------*/
+    override fun upsertProjectIp(ip: String, projectId: String): ProjectIp? {
+        // First check if record exists
+        val existingSqlStr = "SELECT * FROM project_ips WHERE ip = ? AND projectId = ?"
+        println("existingSqlStr -> $existingSqlStr")
+        
+        return try {
+            val existingRecords = mJdbcTemplate.query(existingSqlStr, PreparedStatementSetter {
+                it.setString(1, ip)
+                it.setString(2, projectId)
+            }, BeanPropertyRowMapper(ProjectIp::class.java))
+            
+            val currentTimestamp = (System.currentTimeMillis() / 1000).toInt()
+            
+            if (existingRecords.isNotEmpty()) {
+                // Record exists, update timestamp
+                val existingRecord = existingRecords.first()
+                val updateSqlStr = "UPDATE project_ips SET update_time = ? WHERE id = ?"
+                println("updateSqlStr -> $updateSqlStr")
+                
+                val updateResult = mJdbcTemplate.update(updateSqlStr) {
+                    it.setInt(1, currentTimestamp)
+                    it.setInt(2, existingRecord.id!!)
+                }
+                
+                if (updateResult > 0) {
+                    println("更新ProjectIp时间戳: ${existingRecord.id}")
+                    queryProjectIpById(existingRecord.id!!)
+                } else {
+                    null
+                }
+            } else {
+                // Record doesn't exist, insert new one
+                val insertSqlStr = "INSERT INTO project_ips(ip, projectId, update_time) VALUES(?, ?, ?)"
+                println("insertSqlStr -> $insertSqlStr")
+                
+                val keyHolder = GeneratedKeyHolder()
+                val affectedRows = mJdbcTemplate.update({ connection ->
+                    val ps = connection.prepareStatement(insertSqlStr, arrayOf("id"))
+                    ps.setString(1, ip)
+                    ps.setString(2, projectId)
+                    ps.setInt(3, currentTimestamp)
+                    ps
+                }, keyHolder)
+                
+                if (affectedRows > 0) {
+                    keyHolder.key?.let { generatedId ->
+                        println("新增ProjectIp: $generatedId")
+                        queryProjectIpById(generatedId.toInt())
+                    }
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+    
+    override fun deleteProjectIp(id: Int): Boolean {
+        val sqlStr = "DELETE FROM project_ips WHERE id = ?"
+        println("sqlStr -> $sqlStr")
+        
+        return try {
+            mJdbcTemplate.update(sqlStr) {
+                it.setInt(1, id)
+            } > 0
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+    
+    override fun queryProjectIpById(id: Int): ProjectIp? {
+        val sqlStr = "SELECT * FROM project_ips WHERE id = ?"
+        println("sqlStr -> $sqlStr")
+        
+        return try {
+            val results = mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
+                it.setInt(1, id)
+            }, BeanPropertyRowMapper(ProjectIp::class.java))
+            
+            results.firstOrNull()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+    
+    override fun queryProjectIpsByProjectId(projectId: String): List<ProjectIp> {
+        val sqlStr = "SELECT * FROM project_ips WHERE projectId = ? ORDER BY update_time DESC"
+        println("sqlStr -> $sqlStr")
+        
+        return try {
+            mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
+                it.setString(1, projectId)
+            }, BeanPropertyRowMapper(ProjectIp::class.java))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+    
+    override fun queryProjectIpsByIp(ip: String): List<ProjectIp> {
+        val sqlStr = "SELECT * FROM project_ips WHERE ip = ? ORDER BY update_time DESC"
+        println("sqlStr -> $sqlStr")
+        
+        return try {
+            mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
+                it.setString(1, ip)
+            }, BeanPropertyRowMapper(ProjectIp::class.java))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+    
+    override fun queryAllProjectIps(): List<ProjectIp> {
+        val sqlStr = "SELECT * FROM project_ips ORDER BY update_time DESC"
+        println("sqlStr -> $sqlStr")
+        
+        return try {
+            mJdbcTemplate.query(sqlStr, BeanPropertyRowMapper(ProjectIp::class.java))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
 }

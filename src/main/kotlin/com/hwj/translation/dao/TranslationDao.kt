@@ -2,6 +2,7 @@ package com.hwj.translation.dao
 
 import com.hwj.translation.bean.Language
 import com.hwj.translation.bean.Project
+import com.hwj.translation.bean.ProjectIp
 import com.hwj.translation.bean.Translation
 import com.hwj.translation.bean.TranslationRow
 
@@ -75,5 +76,13 @@ interface TranslationDao {
     /**Translation Search by Content*/
     fun searchTranslationKeysByContent(projectId: String, targetTranslationContent: String, languageId: Int): List<String>
     fun getTranslationRowsByKeys(projectId: String, translationKeys: List<String>): List<TranslationRow>
+
+    /**ProjectIp CRUD Operations*/
+    fun upsertProjectIp(ip: String, projectId: String): ProjectIp?
+    fun deleteProjectIp(id: Int): Boolean
+    fun queryProjectIpById(id: Int): ProjectIp?
+    fun queryProjectIpsByProjectId(projectId: String): List<ProjectIp>
+    fun queryProjectIpsByIp(ip: String): List<ProjectIp>
+    fun queryAllProjectIps(): List<ProjectIp>
 
 }
