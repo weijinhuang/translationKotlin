@@ -54,3 +54,5 @@ const val UPSERT_PROJECT_IP = "upsertProjectIp"
 const val DELETE_PROJECT_IP = "deleteProjectIp"
 const val QUERY_PROJECT_IPS = "queryProjectIps"
 
+const val QUERY_WORLD_LANGUAGES = "queryWorldLanguages"
+

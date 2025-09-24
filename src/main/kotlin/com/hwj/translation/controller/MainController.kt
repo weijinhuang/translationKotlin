@@ -135,6 +135,8 @@ class MainController {
             DELETE_PROJECT_IP -> mProjectIpRepository.deleteProjectIpV2(param)
             QUERY_PROJECT_IPS -> mProjectIpRepository.queryProjectIpsV2(param)
 
+            QUERY_WORLD_LANGUAGES -> CommonResponse(200,"", CommonLanguageList())
+
             null -> CommonResponse(code = -1, msg = "接口名为空", null)
             else -> CommonResponse(code = 400, msg = "未知接口${param.cmd}", null)
         }
