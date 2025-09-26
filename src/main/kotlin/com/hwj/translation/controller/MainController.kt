@@ -133,7 +133,7 @@ class MainController {
 
             UPSERT_PROJECT_IP -> mProjectIpRepository.upsertProjectIp(mRequest?.remoteAddr?:"",param)
             DELETE_PROJECT_IP -> mProjectIpRepository.deleteProjectIpV2(param)
-            QUERY_PROJECT_IPS -> mProjectIpRepository.queryProjectIpsV2(param)
+            QUERY_PROJECT_IPS -> mProjectIpRepository.queryProjectIpsV2(mRequest?.remoteAddr?:"",param)
 
             QUERY_WORLD_LANGUAGES -> CommonResponse(200,"", CommonLanguageList())
 

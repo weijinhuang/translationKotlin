@@ -48,26 +48,17 @@ class ProjectIpRepository(translationDao: TranslationDao) : BaseRepository(trans
         } ?: CommonResponse(-1, "参数解析错误", null)
     }
 
-    fun queryProjectIpsV2(param: CommonParam<*>): CommonResponse<List<ProjectIp>> {
+    fun queryProjectIpsV2(ip:String,param: CommonParam<*>): CommonResponse<List<ProjectIp>> {
         return parseRealParam(param, QueryProjectIpParam::class.java)?.let { realParam ->
             try {
                 val results = when {
-                    realParam.projectId != null && realParam.ip != null -> {
-                        // 如果同时提供了projectId和ip，查找两者都匹配的记录
-                        val projectResults = mTranslationDao.queryProjectIpsByProjectId(realParam.projectId)
-                        projectResults.filter { it.ip == realParam.ip }
-                    }
-                    realParam.projectId != null -> {
-                        // 只提供了projectId
-                        mTranslationDao.queryProjectIpsByProjectId(realParam.projectId)
-                    }
-                    realParam.ip != null -> {
+                    ip.isNotEmpty()-> {
                         // 只提供了ip
-                        mTranslationDao.queryProjectIpsByIp(realParam.ip)
+                        mTranslationDao.queryProjectIpsByIp(ip)
                     }
                     else -> {
                         // 都没提供，查询所有
-                        mTranslationDao.queryAllProjectIps()
+                        emptyList<ProjectIp>()
                     }
                 }
                 
