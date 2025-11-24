@@ -100,7 +100,7 @@ class MainController {
     @CrossOrigin
     @RequestMapping("/translationSystem")
     fun <PARAM, RESPONSE> mainEntrance(@RequestBody param: CommonParam<PARAM>): CommonResponse<RESPONSE?> {
-        println("↓↓↓↓↓↓↓↓↓↓↓↓↓↓ ${param.cmd} ${Date().toLocaleString()} ")
+        println("IP: ${mRequest?.remoteAddr} START => ${param.cmd} ${Date().toLocaleString()} ")
         val commonResponse = when (param.cmd) {
             GET_ALL_PROJECTS -> mProjectRepository.getProjectsV2()
             DELETE_PROJECT -> mProjectRepository.deleteProjectV2(param)

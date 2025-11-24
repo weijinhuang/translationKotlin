@@ -11,7 +11,7 @@ class IosStringsParser : TranslationParser {
 
     // 正则匹配: "key" = "value";
 //    private val pattern = "\"([^\"]+)\"\\s*=\\s*\"((?:\\\\\"|[^\"])*)\"\\s*;".toRegex()
-    private val regex  = "\"([^\"]+)\"\\s*=\\s*([^;]+);".toRegex()
+    private val regex  = "\"([^\"]+)\"\\s*=\"\\s*([^;]+)\";".toRegex()
 
     private val regex2 = """"([^"]+)"\s*=\s*"([^"]+)";""".toRegex()
     override fun parse(content: String, stream: InputStream): ParseTranslationResult {
