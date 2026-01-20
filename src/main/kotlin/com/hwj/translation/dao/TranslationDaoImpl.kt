@@ -1,7 +1,6 @@
 package com.hwj.translation.dao
 
 import com.hwj.translation.bean.*
-import com.hwj.translation.bean.param.CommonParam
 import com.hwj.translation.print
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.BatchPreparedStatementSetter
@@ -10,7 +9,6 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.PreparedStatementSetter
 import org.springframework.jdbc.support.GeneratedKeyHolder
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.sql.PreparedStatement
 
 @Service("translationDaoImpl")
@@ -897,6 +895,52 @@ class TranslationDaoImpl : TranslationDao {
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
+        }
+    }
+
+   
+    override fun upsertTranslationEngine(ip: String, engine: String): TranslationEnginePreference? {
+        val currentTimestamp = (System.currentTimeMillis() / 1000).toInt()
+        
+        try {
+            mJdbcTemplate.execute("CREATE TABLE IF NOT EXISTS translation_engine_preference (ip VARCHAR(255) PRIMARY KEY, engine VARCHAR(50), update_time INT)")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return try {
+            val existingRecord = queryTranslationEngineByIp(ip)
+            if (existingRecord != null) {
+                val updateSql = "UPDATE translation_engine_preference SET engine = ?, update_time = ? WHERE ip = ?"
+                mJdbcTemplate.update(updateSql, engine, currentTimestamp, ip)
+                queryTranslationEngineByIp(ip)
+            } else {
+                val insertSql = "INSERT INTO translation_engine_preference(ip, engine, update_time) VALUES(?, ?, ?)"
+                mJdbcTemplate.update(insertSql, ip, engine, currentTimestamp)
+                queryTranslationEngineByIp(ip)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    override fun queryTranslationEngineByIp(ip: String): TranslationEnginePreference? {
+        try {
+            mJdbcTemplate.execute("CREATE TABLE IF NOT EXISTS translation_engine_preference (ip VARCHAR(255) PRIMARY KEY, engine VARCHAR(50), update_time INT)")
+        } catch (e: Exception) {
+            // e.printStackTrace()
+        }
+        
+        val sqlStr = "SELECT * FROM translation_engine_preference WHERE ip = ?"
+        return try {
+            val results = mJdbcTemplate.query(sqlStr, PreparedStatementSetter {
+                it.setString(1, ip)
+            }, BeanPropertyRowMapper(TranslationEnginePreference::class.java))
+            results.firstOrNull()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 }

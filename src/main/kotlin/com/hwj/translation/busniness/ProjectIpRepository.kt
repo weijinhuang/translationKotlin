@@ -2,6 +2,7 @@ package com.hwj.translation.busniness
 
 import com.hwj.translation.bean.CommonResponse
 import com.hwj.translation.bean.ProjectIp
+import com.hwj.translation.bean.TranslationEnginePreference
 import com.hwj.translation.bean.param.*
 import com.hwj.translation.dao.TranslationDao
 
@@ -69,4 +70,42 @@ class ProjectIpRepository(translationDao: TranslationDao) : BaseRepository(trans
             }
         } ?: CommonResponse(-1, "参数解析错误", emptyList())
     }
+
+    fun upsertTranslationEngine(ip: String, param: CommonParam<*>): CommonResponse<TranslationEnginePreference?> {
+        return parseRealParam(param, TranslationEngineParam::class.java)?.let { realParam ->
+            try {
+                if (ip.isBlank()) {
+                    return CommonResponse(-1, "获取不到当前平台的IP地址", null)
+                }
+                
+                if (realParam.engine.isNullOrBlank()) {
+                    return CommonResponse(-1, "翻译引擎不能为空", null)
+                }
+                
+                val result = mTranslationDao.upsertTranslationEngine(ip, realParam.engine!!)
+                if (result != null) {
+                    CommonResponse(200, "操作成功", result)
+                } else {
+                    CommonResponse(-1, "操作失败", null)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                CommonResponse(-1, "操作失败：${e.message}", null)
+            }
+        } ?: CommonResponse(-1, "参数解析错误", null)
+    }
+
+    fun queryTranslationEngine(ip: String, param: CommonParam<*>): CommonResponse<TranslationEnginePreference?> {
+        return try {
+            if (ip.isBlank()) {
+                 return CommonResponse(-1, "获取不到当前平台的IP地址", null)
+            }
+            val result = mTranslationDao.queryTranslationEngineByIp(ip)
+            CommonResponse(200, "查询成功", result)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            CommonResponse(-1, "查询失败：${e.message}", null)
+        }
+    }
+
 }

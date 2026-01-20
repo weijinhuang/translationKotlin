@@ -38,6 +38,8 @@ const val UPDATE_TRANSLATION = "updateTranslations"
 
 const val TRANSLATE_BY_BAIDU = "translateByBaidu"
 
+const val TRANSLATE_BY_DEEPSEEK = "translateByDeepSeek"
+
 const val GET_ALL_MODULES = "getAllModules"
 
 const val ADD_MODULE = "addModule"
@@ -53,6 +55,9 @@ const val SEARCH_TRANSLATIONS_BY_CONTENT = "searchTranslationsByContent"
 const val UPSERT_PROJECT_IP = "upsertProjectIp"
 const val DELETE_PROJECT_IP = "deleteProjectIp"
 const val QUERY_PROJECT_IPS = "queryProjectIps"
+
+const val UPSERT_TRANSLATION_ENGINE = "upsertTranslationEngine"
+const val QUERY_TRANSLATION_ENGINE = "queryTranslationEngine"
 
 const val QUERY_WORLD_LANGUAGES = "queryWorldLanguages"
 

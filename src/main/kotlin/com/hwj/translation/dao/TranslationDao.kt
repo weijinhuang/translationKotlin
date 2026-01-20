@@ -1,10 +1,6 @@
 package com.hwj.translation.dao
 
-import com.hwj.translation.bean.Language
-import com.hwj.translation.bean.Project
-import com.hwj.translation.bean.ProjectIp
-import com.hwj.translation.bean.Translation
-import com.hwj.translation.bean.TranslationRow
+import com.hwj.translation.bean.*
 
 interface TranslationDao {
 
@@ -84,5 +80,9 @@ interface TranslationDao {
     fun queryProjectIpsByProjectId(projectId: String): List<ProjectIp>
     fun queryProjectIpsByIp(ip: String): List<ProjectIp>
     fun queryAllProjectIps(): List<ProjectIp>
+
+    /**Translation Engine Preference*/
+    fun upsertTranslationEngine(ip: String, engine: String): TranslationEnginePreference?
+    fun queryTranslationEngineByIp(ip: String): TranslationEnginePreference?
 
 }

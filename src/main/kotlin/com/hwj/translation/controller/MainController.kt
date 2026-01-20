@@ -9,15 +9,14 @@ import com.google.gson.reflect.TypeToken
 import com.hwj.translation.baidu.TransApi
 import com.hwj.translation.bean.*
 import com.hwj.translation.bean.param.*
-import com.hwj.translation.busniness.LanguageRepository
-import com.hwj.translation.busniness.ModuleRepository
-import com.hwj.translation.busniness.ProjectIpRepository
-import com.hwj.translation.busniness.ProjectRepository
-import com.hwj.translation.busniness.TranslationRepository
+import com.hwj.translation.busniness.*
 import com.hwj.translation.dao.TranslationDaoImpl
+import com.hwj.translation.net.RetrofitUtil.mOkHttpClient
 import com.hwj.translation.util.*
 import io.github.evanrupert.excelkt.workbook
 import jakarta.servlet.http.HttpServletRequest
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.Request
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -125,15 +124,20 @@ class MainController {
             MERGE_TRANSLATION -> mTranslationRepository.mergeTranslationV2(param)
 
             TRANSLATE_BY_BAIDU -> translateByBaiduV2(param)
-            TRANSLATE_BY_GOOGLE -> translateByGoogleV2(param)
+//            TRANSLATE_BY_GOOGLE -> translateByGoogleV2(param)
+            TRANSLATE_BY_GOOGLE -> translateByDeepSeek(param)
+            TRANSLATE_BY_DEEPSEEK -> translateByDeepSeek(param)
 
             GET_ALL_MODULES -> mModuleRepository.getAllModulesV2(param)
             ADD_MODULE -> mModuleRepository.addModuleV2(param)
             DELETE_MODULE -> mModuleRepository.deleteModuleV2(param)
 
+            UPSERT_TRANSLATION_ENGINE -> mProjectIpRepository.upsertTranslationEngine(mRequest?.remoteAddr?:"",param)
+            QUERY_TRANSLATION_ENGINE -> mProjectIpRepository.queryTranslationEngine(mRequest?.remoteAddr?:"",param)
+
             UPSERT_PROJECT_IP -> mProjectIpRepository.upsertProjectIp(mRequest?.remoteAddr?:"",param)
             DELETE_PROJECT_IP -> mProjectIpRepository.deleteProjectIpV2(param)
-            QUERY_PROJECT_IPS -> mProjectIpRepository.queryProjectIpsV2(mRequest?.remoteAddr?:"",param)
+                QUERY_PROJECT_IPS -> mProjectIpRepository.queryProjectIpsV2(mRequest?.remoteAddr?:"",param)
 
             QUERY_WORLD_LANGUAGES -> CommonResponse(200,"", CommonLanguageList())
 
@@ -217,6 +221,72 @@ class MainController {
             }
         } ?: CommonResponse(-1, "参数解析错误", null)
 
+    }
+
+    
+    fun translateByDeepSeek(commonParam: CommonParam<*>): CommonResponse<TranslationResult> {
+        return parseRealParam(commonParam, DeepSeekTranslationParam::class.java)?.let { param ->
+            val apiKey = "sk-abfa10f449d0404ebdce2568753cd234" // Placeholder API Key
+            val url = "https://api.deepseek.com/chat/completions"
+
+            val client = mOkHttpClient
+
+            val targetLanguageList = param.targetLanguage?.joinToString(separator = ",")
+
+            if(targetLanguageList.isNullOrEmpty()){
+                return CommonResponse(-1, "没有目标语言", null)
+            }
+            println("DeepSeek翻译，content：${param.content} ${param.sourceLanguage} -> $targetLanguageList")
+            val messages = listOf(
+                mapOf("role" to "system", "content" to "你是个专业的翻译专家。"),
+                mapOf("role" to "user", "content" to "翻译内容：${param.content},使用场景：使用安防监控app的文案。源语言： ${param.sourceLanguage} ，目标语言：${targetLanguageList}。 以JSON形式给我返回翻译结果，如{\"language\":\"translationResult\"}")
+            )
+
+            val requestBodyMap = mapOf(
+                "model" to "deepseek-chat",
+                "messages" to messages,
+                "stream" to false
+            )
+
+            val jsonBody = Gson().toJson(requestBodyMap)
+
+            val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+            val requestBody = okhttp3.RequestBody.create(mediaType, jsonBody)
+
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Content-Type", "application/json")
+                .post(requestBody)
+                .build()
+
+            try {
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val responseBodyStr = response.body?.string()
+                    // Parse responseBodyStr to get translated text
+                    val deepSeekTranslationResult = Gson().fromJson<DeepSeekTranslationResult>(responseBodyStr, DeepSeekTranslationResult::class.java)
+//                    val responseJson = Gson().fromJson(responseBodyStr, Map::class.java)
+                    val choices = deepSeekTranslationResult.choices
+//                    val message = deepSeekTranslationResult.
+                    val content = deepSeekTranslationResult.choices.first().message.content
+                    val result = TranslationResult().apply {
+                        sourceLanguage = param.sourceLanguage
+                        targetLanguage = ""
+                        translationResultList = content
+                        errorCode = 0
+                    }
+                    CommonResponse(200, "", result)
+                } else {
+                    val errorBody = response.body?.string()
+                    println("DeepSeek API Error: ${response.code} - $errorBody")
+                    CommonResponse(-1, "DeepSeek API Error: ${response.code}", null)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                CommonResponse(-1, e.message, null)
+            }
+        } ?: CommonResponse(-1, "参数解析错误", null)
     }
 
 
