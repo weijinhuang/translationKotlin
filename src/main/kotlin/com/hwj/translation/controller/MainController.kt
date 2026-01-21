@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder.json
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import java.io.*
@@ -37,6 +38,7 @@ import javax.xml.transform.stream.StreamResult
 
 const val proxyHost = "127.0.0.1"
 const val proxyPort = "7897"
+
 @RestController
 class MainController {
 
@@ -124,22 +126,22 @@ class MainController {
             MERGE_TRANSLATION -> mTranslationRepository.mergeTranslationV2(param)
 
             TRANSLATE_BY_BAIDU -> translateByBaiduV2(param)
-//            TRANSLATE_BY_GOOGLE -> translateByGoogleV2(param)
-            TRANSLATE_BY_GOOGLE -> translateByDeepSeek(param)
+            TRANSLATE_BY_GOOGLE -> translateByGoogleV2(param)
+//            TRANSLATE_BY_GOOGLE -> translateByDeepSeek(param)
             TRANSLATE_BY_DEEPSEEK -> translateByDeepSeek(param)
 
             GET_ALL_MODULES -> mModuleRepository.getAllModulesV2(param)
             ADD_MODULE -> mModuleRepository.addModuleV2(param)
             DELETE_MODULE -> mModuleRepository.deleteModuleV2(param)
 
-            UPSERT_TRANSLATION_ENGINE -> mProjectIpRepository.upsertTranslationEngine(mRequest?.remoteAddr?:"",param)
-            QUERY_TRANSLATION_ENGINE -> mProjectIpRepository.queryTranslationEngine(mRequest?.remoteAddr?:"",param)
+            UPSERT_TRANSLATION_ENGINE -> mProjectIpRepository.upsertTranslationEngine(mRequest?.remoteAddr ?: "", param)
+            QUERY_TRANSLATION_ENGINE -> mProjectIpRepository.queryTranslationEngine(mRequest?.remoteAddr ?: "", param)
 
-            UPSERT_PROJECT_IP -> mProjectIpRepository.upsertProjectIp(mRequest?.remoteAddr?:"",param)
+            UPSERT_PROJECT_IP -> mProjectIpRepository.upsertProjectIp(mRequest?.remoteAddr ?: "", param)
             DELETE_PROJECT_IP -> mProjectIpRepository.deleteProjectIpV2(param)
-                QUERY_PROJECT_IPS -> mProjectIpRepository.queryProjectIpsV2(mRequest?.remoteAddr?:"",param)
+            QUERY_PROJECT_IPS -> mProjectIpRepository.queryProjectIpsV2(mRequest?.remoteAddr ?: "", param)
 
-            QUERY_WORLD_LANGUAGES -> CommonResponse(200,"", CommonLanguageList())
+            QUERY_WORLD_LANGUAGES -> CommonResponse(200, "", CommonLanguageList())
 
             null -> CommonResponse(code = -1, msg = "接口名为空", null)
             else -> CommonResponse(code = 400, msg = "未知接口${param.cmd}", null)
@@ -223,23 +225,31 @@ class MainController {
 
     }
 
-    
+
     fun translateByDeepSeek(commonParam: CommonParam<*>): CommonResponse<TranslationResult> {
         return parseRealParam(commonParam, DeepSeekTranslationParam::class.java)?.let { param ->
-            val apiKey = "sk-abfa10f449d0404ebdce2568753cd234" // Placeholder API Key
+
+            val apiKey = System.getenv("DEEPSEEK_API_KEY") ?: System.getProperty("DEEPSEEK_API_KEY")
+            if (apiKey.isNullOrBlank()) {
+                return CommonResponse(-1, "DeepSeek API key未配置", null)
+            }
+
             val url = "https://api.deepseek.com/chat/completions"
 
             val client = mOkHttpClient
 
             val targetLanguageList = param.targetLanguage?.joinToString(separator = ",")
 
-            if(targetLanguageList.isNullOrEmpty()){
+            if (targetLanguageList.isNullOrEmpty()) {
                 return CommonResponse(-1, "没有目标语言", null)
             }
             println("DeepSeek翻译，content：${param.content} ${param.sourceLanguage} -> $targetLanguageList")
             val messages = listOf(
-                mapOf("role" to "system", "content" to "你是个专业的翻译专家。"),
-                mapOf("role" to "user", "content" to "翻译内容：${param.content},使用场景：使用安防监控app的文案。源语言： ${param.sourceLanguage} ，目标语言：${targetLanguageList}。 以JSON形式给我返回翻译结果，如{\"language\":\"translationResult\"}")
+                mapOf("role" to "system", "content" to "你是个专业的翻译专家，正在使用智能家居安防监控app。"),
+                mapOf(
+                    "role" to "user",
+                    "content" to "帮我做一下翻译\n原文：${param.content}。原文语言是： ${param.sourceLanguage} ，目标语言有以下列表：[${targetLanguageList}]。 以以下的列表形式给我返回翻译结果，如[{\"languageName\":\"en\",\"translatedResult\":\"Hello,this is english translated result\"}]"
+                )
             )
 
             val requestBodyMap = mapOf(
@@ -270,10 +280,12 @@ class MainController {
                     val choices = deepSeekTranslationResult.choices
 //                    val message = deepSeekTranslationResult.
                     val content = deepSeekTranslationResult.choices.first().message.content
+                    val translatedResultKVListType = object : TypeToken<List<TranslatedResultKV?>?>() {}.type
+                    val translatedResultKVList: List<TranslatedResultKV> = Gson().fromJson(content, translatedResultKVListType)
                     val result = TranslationResult().apply {
                         sourceLanguage = param.sourceLanguage
                         targetLanguage = ""
-                        translationResultList = content
+                        this.translationResultList = translatedResultKVList
                         errorCode = 0
                     }
                     CommonResponse(200, "", result)
@@ -358,7 +370,7 @@ class MainController {
         }
     }
 
-    fun exportExcelOfKey(param:ExportTranslationParam):ResponseEntity<ByteArray>{
+    fun exportExcelOfKey(param: ExportTranslationParam): ResponseEntity<ByteArray> {
         log(mRequest?.remoteAddr, "exportExcel")
         val mainProjectId = param.projectIdList.first()
 
