@@ -229,7 +229,7 @@ class MainController {
     fun translateByDeepSeek(commonParam: CommonParam<*>): CommonResponse<TranslationResult> {
         return parseRealParam(commonParam, DeepSeekTranslationParam::class.java)?.let { param ->
 
-            val apiKey = System.getenv("DEEPSEEK_API_KEY") ?: System.getProperty("DEEPSEEK_API_KEY")
+            val apiKey = System.getenv("DEEPSEEK_API_KEY") ?: System.getProperty("DEEPSEEK_API_KEY") ?: "sk-abfa10f449d0404ebdce2568753cd234"
             if (apiKey.isNullOrBlank()) {
                 return CommonResponse(-1, "DeepSeek API key未配置", null)
             }
@@ -243,12 +243,15 @@ class MainController {
             if (targetLanguageList.isNullOrEmpty()) {
                 return CommonResponse(-1, "没有目标语言", null)
             }
-            println("DeepSeek翻译，content：${param.content} ${param.sourceLanguage} -> $targetLanguageList")
+            val roleContent =
+                "帮我做一下翻译，原文：${param.content}，原文语言是： ${param.sourceLanguage}，${param.translateContext?.let { "使用场景：${it}" } ?: ""},目标语言有以下列表：[${targetLanguageList}]。 以以下的列表形式给我返回翻译结果，如[{\"languageName\":\"en\",\"translatedResult\":\"Hello,this is english translated result\"}]"
+
+            println("DeepSeek翻译，content：${param.content} ${param.sourceLanguage} -> $targetLanguageList roleContent:$roleContent")
             val messages = listOf(
                 mapOf("role" to "system", "content" to "你是个专业的翻译专家，正在使用智能家居安防监控app。"),
                 mapOf(
                     "role" to "user",
-                    "content" to "帮我做一下翻译\n原文：${param.content}。原文语言是： ${param.sourceLanguage} ，目标语言有以下列表：[${targetLanguageList}]。 以以下的列表形式给我返回翻译结果，如[{\"languageName\":\"en\",\"translatedResult\":\"Hello,this is english translated result\"}]"
+                    "content" to roleContent
                 )
             )
 
@@ -275,7 +278,7 @@ class MainController {
                 if (response.isSuccessful) {
                     val responseBodyStr = response.body?.string()
                     // Parse responseBodyStr to get translated text
-                    val deepSeekTranslationResult = Gson().fromJson<DeepSeekTranslationResult>(responseBodyStr, DeepSeekTranslationResult::class.java)
+                    val deepSeekTranslationResult = Gson().fromJson(responseBodyStr, DeepSeekTranslationResult::class.java)
 //                    val responseJson = Gson().fromJson(responseBodyStr, Map::class.java)
                     val choices = deepSeekTranslationResult.choices
 //                    val message = deepSeekTranslationResult.
