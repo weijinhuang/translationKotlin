@@ -21,7 +21,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder.json
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import java.io.*
@@ -165,24 +164,45 @@ class MainController {
                     sourceLanguage = detection.language
                     println("检测到语言:$sourceLanguage")
                 }
-                return try {
-                    println("开始翻译：sourceLanguage:$sourceLanguage targetLanguage:${realParam.targetLanguage} content:${realParam.content}")
-                    val translateResult =
-                        translateService.translate(
-                            realParam.content,
-                            Translate.TranslateOption.sourceLanguage(sourceLanguage),
-                            Translate.TranslateOption.targetLanguage(realParam.targetLanguage),
-                            Translate.TranslateOption.format("text")
+                if (realParam.targetLanguageList.isNullOrEmpty()) {
+                    return try {
+                        println("开始翻译：sourceLanguage:$sourceLanguage targetLanguage:${realParam.targetLanguage} content:${realParam.content}")
+                        val translateResult = translateService.translate(
+                            realParam.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(realParam.targetLanguage), Translate.TranslateOption.format("text")
                         )
-                    println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
-                    CommonResponse(200, "", TranslationResult().apply {
-                        this.sourceLanguage = realParam.sourceLanguage
-                        targetLanguage = realParam.targetLanguage
-                        transResult = translateResult.translatedText
-                        errorCode = 0
-                    })
-                } catch (e: Exception) {
-                    CommonResponse(-1, e.message, null);
+                        println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
+                        CommonResponse(200, "", TranslationResult().apply {
+                            this.sourceLanguage = realParam.sourceLanguage
+                            targetLanguage = realParam.targetLanguage
+                            transResult = translateResult.translatedText
+                            errorCode = 0
+                        })
+                    } catch (e: Exception) {
+                        CommonResponse(-1, e.message, null);
+                    }
+                } else {
+                    return try {
+                        var translationResultList: MutableList<TranslatedResultKV> = mutableListOf()
+                        realParam.targetLanguageList?.forEach { targetLanguage ->
+                            println("开始翻译：sourceLanguage:$sourceLanguage targetLanguage:${targetLanguage} content:${realParam.content}")
+                            val translateResult = translateService.translate(
+                                realParam.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(targetLanguage), Translate.TranslateOption.format("text")
+                            )
+                            println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
+                            val translatedResultKV = TranslatedResultKV().apply {
+                                this.languageName = targetLanguage
+                                this.translatedResult = translateResult.translatedText
+                            }
+                            translationResultList.add(translatedResultKV)
+                        }
+                        CommonResponse(0, "", TranslationResult().apply {
+                            this.sourceLanguage = realParam.sourceLanguage
+                            this.translationResultList = translationResultList
+                            errorCode = 0
+                        })
+                    } catch (e: Exception) {
+                        CommonResponse(-1, e.message, null);
+                    }
                 }
             } ?: CommonResponse(-1, "参数解析出错", null)
 
@@ -225,6 +245,21 @@ class MainController {
 
     }
 
+    fun calculateCost(
+        cacheHitTokens: Int,
+        cacheMissTokens: Int,
+        outputTokens: Int
+    ): Double {
+        val cacheHitPricePerMillion = 0.2  // 元/百万tokens
+        val cacheMissPricePerMillion = 2.0  // 元/百万tokens
+        val outputPricePerMillion = 3.0     // 元/百万tokens
+
+        val cacheHitCost = cacheHitTokens * cacheHitPricePerMillion / 1_000_000.0
+        val cacheMissCost = cacheMissTokens * cacheMissPricePerMillion / 1_000_000.0
+        val outputCost = outputTokens * outputPricePerMillion / 1_000_000.0
+
+        return cacheHitCost + cacheMissCost + outputCost
+    }
 
     fun translateByDeepSeek(commonParam: CommonParam<*>): CommonResponse<TranslationResult> {
         return parseRealParam(commonParam, DeepSeekTranslationParam::class.java)?.let { param ->
@@ -238,27 +273,40 @@ class MainController {
 
             val client = mOkHttpClient
 
-            val targetLanguageList = param.targetLanguage?.joinToString(separator = ",")
+            val targetLanguageList = param.targetLanguageList?.joinToString(separator = ",")
 
             if (targetLanguageList.isNullOrEmpty()) {
                 return CommonResponse(-1, "没有目标语言", null)
             }
-            val roleContent =
-                "帮我做一下翻译，原文：${param.content}，原文语言是： ${param.sourceLanguage}，${param.translateContext?.let { "使用场景：${it}" } ?: ""},目标语言有以下列表：[${targetLanguageList}]。 以以下的列表形式给我返回翻译结果，如[{\"languageName\":\"en\",\"translatedResult\":\"Hello,this is english translated result\"}]"
-
+            val systemContent = "你是个翻译专家，执行以下步骤：\n1. 识别用户消息中的【待翻译文本】\n2. 按指定格式返回翻译结果\n3.翻译尽可能的简短，因为文案会使用在手机app上"
+            val roleContent = """
+                            |参数：
+                            |- 原文语言：${param.sourceLanguage}
+                            |- 目标语言列表：[${targetLanguageList}]
+                            |- 文本使用场景：智能家居App ${param.translateContext ?: ""}
+                            |
+                            |请务必输出一个有效的JSON对象，不要包含任何其他解释文字。
+                            |期望的JSON输出格式示例：
+                            |[
+                            |  {"languageName": "en", "translatedResult": "Hello"},
+                            |  {"languageName": "ja", "translatedResult": "こんにちは"}
+                            | ]
+                            |
+                            |待翻译文本：${param.content}
+                            |""".trimMargin()
             println("DeepSeek翻译，content：${param.content} ${param.sourceLanguage} -> $targetLanguageList roleContent:$roleContent")
             val messages = listOf(
-                mapOf("role" to "system", "content" to "你是个专业的翻译专家，正在使用智能家居安防监控app。"),
-                mapOf(
-                    "role" to "user",
-                    "content" to roleContent
+                mapOf("role" to "system", "content" to systemContent), mapOf(
+                    "role" to "user", "content" to roleContent
                 )
             )
 
             val requestBodyMap = mapOf(
                 "model" to "deepseek-chat",
                 "messages" to messages,
-                "stream" to false
+                "stream" to false,
+                "response_format" to mapOf("type" to "json_object"), //
+                "max_tokens" to 1000, // 防止长JSON被截断
             )
 
             val jsonBody = Gson().toJson(requestBodyMap)
@@ -266,22 +314,13 @@ class MainController {
             val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
             val requestBody = okhttp3.RequestBody.create(mediaType, jsonBody)
 
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer $apiKey")
-                .addHeader("Content-Type", "application/json")
-                .post(requestBody)
-                .build()
+            val request = Request.Builder().url(url).addHeader("Authorization", "Bearer $apiKey").addHeader("Content-Type", "application/json").post(requestBody).build()
 
             try {
                 val response = client.newCall(request).execute()
                 if (response.isSuccessful) {
                     val responseBodyStr = response.body?.string()
-                    // Parse responseBodyStr to get translated text
                     val deepSeekTranslationResult = Gson().fromJson(responseBodyStr, DeepSeekTranslationResult::class.java)
-//                    val responseJson = Gson().fromJson(responseBodyStr, Map::class.java)
-                    val choices = deepSeekTranslationResult.choices
-//                    val message = deepSeekTranslationResult.
                     val content = deepSeekTranslationResult.choices.first().message.content
                     val translatedResultKVListType = object : TypeToken<List<TranslatedResultKV?>?>() {}.type
                     val translatedResultKVList: List<TranslatedResultKV> = Gson().fromJson(content, translatedResultKVListType)
@@ -291,7 +330,14 @@ class MainController {
                         this.translationResultList = translatedResultKVList
                         errorCode = 0
                     }
-                    CommonResponse(200, "", result)
+                    // 你的数据
+                    val cacheHit = deepSeekTranslationResult.usage.prompt_tokens_details?.cached_tokens ?: 0
+                    val cacheMiss = deepSeekTranslationResult.usage.prompt_cache_miss_tokens ?: 0
+                    val output = deepSeekTranslationResult.usage.completion_tokens ?: 0
+
+                    val totalCost = calculateCost(cacheHit, cacheMiss, output)
+
+                    CommonResponse(200, "本次消耗token：${deepSeekTranslationResult.usage.total_tokens},花费：￥$totalCost", result)
                 } else {
                     val errorBody = response.body?.string()
                     println("DeepSeek API Error: ${response.code} - $errorBody")

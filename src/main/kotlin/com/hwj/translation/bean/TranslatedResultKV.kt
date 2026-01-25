@@ -1,6 +1,6 @@
 package com.hwj.translation.bean
 
 class TranslatedResultKV {
-    val languageName:String = ""
-    val translatedResult:String = ""
+    var languageName:String = ""
+    var translatedResult:String = ""
 }
