@@ -1,8 +1,9 @@
 package com.hwj.translation.util
 
+import com.hwj.translation.println2
 import java.util.*
 
 
 fun log(tag: String? = "", msg: String) {
-    println("[${Date()}][$tag]:${msg}")
+    println2("[${Date()}][$tag]:${msg}")
 }

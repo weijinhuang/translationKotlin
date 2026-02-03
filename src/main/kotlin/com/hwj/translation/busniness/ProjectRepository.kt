@@ -5,6 +5,7 @@ import com.hwj.translation.bean.Language
 import com.hwj.translation.bean.Project
 import com.hwj.translation.bean.param.CommonParam
 import com.hwj.translation.dao.TranslationDao
+import com.hwj.translation.println2
 
 class ProjectRepository(translationDao: TranslationDao) : BaseRepository(translationDao) {
 
@@ -24,7 +25,7 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
         return try {
             parseRealParam(commonParam, Project::class.java)?.let { project ->
                 if (project.projectId.isNullOrEmpty()) {
-                    println("参数错误:projectId为空")
+                    println2("参数错误:projectId为空")
                     CommonResponse(-1, "参数错误：projectId为空", null)
                 } else {
                     val result = mTranslationDao.deleteProject(project)
@@ -45,12 +46,12 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
         return parseRealParam(commonParam, Project::class.java)?.let { project ->
             return try {
                 if (project.projectId.isNullOrBlank()) {
-                    println("参数错误:projectId为空")
+                    println2("参数错误:projectId为空")
                     CommonResponse(-1, "参数错误：projectId为空", null)
                 } else {
                     val queryProjectByPackageName = mTranslationDao.queryProjectsByProjectId(project.projectId!!)
                     if (null != queryProjectByPackageName && queryProjectByPackageName.isNotEmpty()) {
-                        println("项目id已存在")
+                        println2("项目id已存在")
                         CommonResponse(-1, "项目id已存在", null)
                     } else {
                         val success = mTranslationDao.addProject(Project().apply {
@@ -58,7 +59,7 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
                             this.projectId = project.projectId
                         })
                         if (success) {
-                            println("项目添加成功")
+                            println2("Project create success")
                             val resultLanguageList = mutableListOf<Language>()
                             project.languageList?.let { languageList ->
                                 languageList.forEach { language ->
@@ -72,7 +73,7 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
 
                             project.copyFromProject?.let { targetProjectId ->
                                 val startTime = System.currentTimeMillis()
-                                println("复制目标项目：${project.copyFromProject} startTime:$startTime")
+                                println2("Copy TargetProject ：${project.copyFromProject} startTime:$startTime")
                                 val oldModules = mTranslationDao.getAllModules(targetProjectId)
                                 var moduleId = 0
                                 oldModules.forEach { module ->
@@ -83,10 +84,16 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
 
                                 val oldLanguages = mTranslationDao.getLanguageList(targetProjectId)
                                 oldLanguages.forEach { oldLanguage ->
-                                    mTranslationDao.addLanguage2(oldLanguage.languageDes!!, oldLanguage.languageName!!, project.projectId!!)?.let { addLanguage ->
+                                    var addLanguage = mTranslationDao.queryLanguageByLanguageName(oldLanguage.languageName!!, project.projectId!!)?.firstOrNull()
+                                    if (addLanguage == null) {
+                                        println2("Language not exists addNewLanguage")
+                                        addLanguage = mTranslationDao.addLanguage2(oldLanguage.languageDes!!, oldLanguage.languageName!!, project.projectId!!)
+                                    }
+
+                                    addLanguage?.let { addLanguage_ ->
                                         resultLanguageList.add(addLanguage)
                                         val oldTranslations = mTranslationDao.queryTranslationByLanguage(oldLanguage.languageId ?: 0, targetProjectId)
-                                        println("复制语言：${addLanguage},该语言下翻译数:${oldTranslations.size}")
+                                        println2("复制语言：${addLanguage},该语言下翻译数:${oldTranslations.size}")
 
                                         oldTranslations.forEach { translation ->
                                             translation.translationId = null
@@ -95,21 +102,21 @@ class ProjectRepository(translationDao: TranslationDao) : BaseRepository(transla
                                             translation.languageId = addLanguage.languageId ?: 0
 //                                            val addTranslation = mTranslationDao.addTranslation(translation)
 //                                            if (addTranslation) {
-//                                                println("复制翻译:$translation 成功")
+//                                                println2("复制翻译:$translation 成功")
 //                                            } else {
-//                                                println("复制翻译:$translation 失败")
+//                                                println2("复制翻译:$translation 失败")
 //                                            }
                                         }
-                                        mTranslationDao.addTranslation(oldTranslations,moduleId)
+                                        mTranslationDao.addTranslation(oldTranslations, moduleId)
                                     }
                                 }
                                 val endTime = System.currentTimeMillis()
-                                println("复制所花时间：${endTime - startTime}")
+                                println2("复制所花时间：${endTime - startTime}")
                             }
                             project.languageList = resultLanguageList
                             CommonResponse(200, "添加成功", null)
                         } else {
-                            println("添加项目失败")
+                            println2("添加项目失败")
                             CommonResponse(-1, "添加项目失败", null)
                         }
                     }

@@ -6,6 +6,7 @@ import com.hwj.translation.bean.Language
 import com.hwj.translation.bean.param.CommonParam
 import com.hwj.translation.bean.param.QueryLanguageListParam
 import com.hwj.translation.dao.TranslationDao
+import com.hwj.translation.println2
 
 class LanguageRepository(translationDao: TranslationDao) : BaseRepository(translationDao) {
 
@@ -72,18 +73,18 @@ class LanguageRepository(translationDao: TranslationDao) : BaseRepository(transl
                             language.languageName?.let { languageName ->
                                 val queryLanguageList = mTranslationDao.queryLanguageByLanguageName(language.languageName!!, language.projectId!!)
                                 if (!queryLanguageList.isNullOrEmpty()) {
-                                    println("语言已存在")
+                                    println2("语言已存在")
                                     queryLanguageList[0]
                                 } else {
                                     val success = mTranslationDao.addLanguage2(
                                         language.languageDes!!, language.languageName!!, language.projectId!!
                                     )
                                     if (success != null) {
-                                        println("添加成功")
+                                        println2("添加成功")
 //                                        mTranslationDao.queryLanguageByLanguageName(languageName, projectId)?.get(0)
                                         success
                                     } else {
-                                        println("添加语言失败")
+                                        println2("添加语言失败")
                                         return CommonResponse(-1, "添加语言失败", emptyList())
                                     }
                                 }

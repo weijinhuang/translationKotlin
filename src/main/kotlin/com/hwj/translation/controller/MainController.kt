@@ -12,6 +12,7 @@ import com.hwj.translation.bean.param.*
 import com.hwj.translation.busniness.*
 import com.hwj.translation.dao.TranslationDaoImpl
 import com.hwj.translation.net.RetrofitUtil.mOkHttpClient
+import com.hwj.translation.println2
 import com.hwj.translation.util.*
 import io.github.evanrupert.excelkt.workbook
 import jakarta.servlet.http.HttpServletRequest
@@ -79,11 +80,11 @@ class MainController {
     @RequestMapping("getGoogleSupportLanguage")
     fun getGoogleSupportLanguage() {
         initSystemProxy()
-        println("TranslationByGoogle")
+        println2("TranslationByGoogle")
         val translateService = TranslateOptions.getDefaultInstance().service
         val listSupportedLanguages = translateService.listSupportedLanguages()
         listSupportedLanguages.forEach {
-            println("${it.name}:${it.code}")
+            println2("${it.name}:${it.code}")
         }
     }
 
@@ -100,7 +101,7 @@ class MainController {
     @CrossOrigin
     @RequestMapping("/translationSystem")
     fun <PARAM, RESPONSE> mainEntrance(@RequestBody param: CommonParam<PARAM>): CommonResponse<RESPONSE?> {
-        println("IP: ${mRequest?.remoteAddr} START => ${param.cmd} ${Date().toLocaleString()} ")
+        println2("IP: ${mRequest?.remoteAddr} START => ${param.cmd} ${Date().toLocaleString()} ")
         val commonResponse = when (param.cmd) {
             GET_ALL_PROJECTS -> mProjectRepository.getProjectsV2()
             DELETE_PROJECT -> mProjectRepository.deleteProjectV2(param)
@@ -145,7 +146,7 @@ class MainController {
             null -> CommonResponse(code = -1, msg = "接口名为空", null)
             else -> CommonResponse(code = 400, msg = "未知接口${param.cmd}", null)
         }
-        println("↑↑↑↑↑↑↑↑↑↑↑↑↑ ${param.cmd} ${Date()}\n\n\n")
+        println2("↑↑↑↑↑↑↑↑↑↑↑↑↑ ${param.cmd} ${Date()}\n\n\n")
         return commonResponse as CommonResponse<RESPONSE?>
     }
 
@@ -162,15 +163,18 @@ class MainController {
                 if (sourceLanguage.isNullOrEmpty()) {
                     val detection = translateService.detect(realParam.content)
                     sourceLanguage = detection.language
-                    println("检测到语言:$sourceLanguage")
+                    println2("检测到语言:$sourceLanguage")
                 }
                 if (realParam.targetLanguageList.isNullOrEmpty()) {
                     return try {
-                        println("开始翻译：sourceLanguage:$sourceLanguage targetLanguage:${realParam.targetLanguage} content:${realParam.content}")
+                        println2("开始翻译：sourceLanguage:$sourceLanguage targetLanguage:${realParam.targetLanguage} content:${realParam.content}")
                         val translateResult = translateService.translate(
-                            realParam.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(realParam.targetLanguage), Translate.TranslateOption.format("text")
+                            realParam.content,
+                            Translate.TranslateOption.sourceLanguage(sourceLanguage),
+                            Translate.TranslateOption.targetLanguage(realParam.targetLanguage),
+                            Translate.TranslateOption.format("text")
                         )
-                        println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
+                        println2("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
                         CommonResponse(200, "", TranslationResult().apply {
                             this.sourceLanguage = realParam.sourceLanguage
                             targetLanguage = realParam.targetLanguage
@@ -184,18 +188,21 @@ class MainController {
                     return try {
                         var translationResultList: MutableList<TranslatedResultKV> = mutableListOf()
                         realParam.targetLanguageList?.forEach { targetLanguage ->
-                            println("开始翻译：sourceLanguage:$sourceLanguage targetLanguage:${targetLanguage} content:${realParam.content}")
+                            println2("开始翻译：sourceLanguage:$sourceLanguage targetLanguage:${targetLanguage} content:${realParam.content}")
                             val translateResult = translateService.translate(
-                                realParam.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(targetLanguage), Translate.TranslateOption.format("text")
+                                realParam.content,
+                                Translate.TranslateOption.sourceLanguage(sourceLanguage),
+                                Translate.TranslateOption.targetLanguage(targetLanguage),
+                                Translate.TranslateOption.format("text")
                             )
-                            println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
+                            println2("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
                             val translatedResultKV = TranslatedResultKV().apply {
                                 this.languageName = targetLanguage
                                 this.translatedResult = translateResult.translatedText
                             }
                             translationResultList.add(translatedResultKV)
                         }
-                        CommonResponse(0, "", TranslationResult().apply {
+                        CommonResponse(200, "", TranslationResult().apply {
                             this.sourceLanguage = realParam.sourceLanguage
                             this.translationResultList = translationResultList
                             errorCode = 0
@@ -222,7 +229,7 @@ class MainController {
             }
 
             val transResult = api.getTransResult(param.q, param.from, param.to)
-            println("$param->$transResult")
+            println2("$param->$transResult")
             val baiduTranslationResultResponse = Gson().fromJson(transResult, BaiduTranslationResult::class.java)
 
             return if (baiduTranslationResultResponse.error_code != null) {
@@ -230,7 +237,7 @@ class MainController {
                     -1, baiduTranslationResultResponse.error_code, null
                 )
             } else {
-                println("baiduTranslationResultResponse:$baiduTranslationResultResponse")
+                println2("baiduTranslationResultResponse:$baiduTranslationResultResponse")
                 val result = TranslationResult().apply {
                     sourceLanguage = param.from
                     targetLanguage = param.to
@@ -294,7 +301,7 @@ class MainController {
                             |
                             |待翻译文本：${param.content}
                             |""".trimMargin()
-            println("DeepSeek翻译，content：${param.content} ${param.sourceLanguage} -> $targetLanguageList roleContent:$roleContent")
+            println2("DeepSeek翻译，content：${param.content} ${param.sourceLanguage} -> $targetLanguageList roleContent:$roleContent")
             val messages = listOf(
                 mapOf("role" to "system", "content" to systemContent), mapOf(
                     "role" to "user", "content" to roleContent
@@ -323,24 +330,30 @@ class MainController {
                     val deepSeekTranslationResult = Gson().fromJson(responseBodyStr, DeepSeekTranslationResult::class.java)
                     val content = deepSeekTranslationResult.choices.first().message.content
                     val translatedResultKVListType = object : TypeToken<List<TranslatedResultKV?>?>() {}.type
-                    val translatedResultKVList: List<TranslatedResultKV> = Gson().fromJson(content, translatedResultKVListType)
-                    val result = TranslationResult().apply {
-                        sourceLanguage = param.sourceLanguage
-                        targetLanguage = ""
-                        this.translationResultList = translatedResultKVList
-                        errorCode = 0
+                    val translatedResultKVList: List<TranslatedResultKV> = try {
+                        Gson().fromJson(content, translatedResultKVListType)
+                    } catch (e: Exception) {
+                        emptyList()
                     }
-                    // 你的数据
-                    val cacheHit = deepSeekTranslationResult.usage.prompt_tokens_details?.cached_tokens ?: 0
-                    val cacheMiss = deepSeekTranslationResult.usage.prompt_cache_miss_tokens ?: 0
-                    val output = deepSeekTranslationResult.usage.completion_tokens ?: 0
-
-                    val totalCost = calculateCost(cacheHit, cacheMiss, output)
-
-                    CommonResponse(200, "本次消耗token：${deepSeekTranslationResult.usage.total_tokens},花费：￥$totalCost", result)
+                    if (translatedResultKVList.isEmpty()) {
+                        CommonResponse(-1, "翻译出现问题", null)
+                    } else {
+                        val result = TranslationResult().apply {
+                            sourceLanguage = param.sourceLanguage
+                            targetLanguage = ""
+                            this.translationResultList = translatedResultKVList
+                            errorCode = 0
+                        }
+                        // 你的数据
+                        val cacheHit = deepSeekTranslationResult.usage.prompt_tokens_details?.cached_tokens ?: 0
+                        val cacheMiss = deepSeekTranslationResult.usage.prompt_cache_miss_tokens ?: 0
+                        val output = deepSeekTranslationResult.usage.completion_tokens ?: 0
+                        val totalCost = calculateCost(cacheHit, cacheMiss, output)
+                        CommonResponse(200, "本次消耗token：${deepSeekTranslationResult.usage.total_tokens},花费：￥$totalCost", result)
+                    }
                 } else {
                     val errorBody = response.body?.string()
-                    println("DeepSeek API Error: ${response.code} - $errorBody")
+                    println2("DeepSeek API Error: ${response.code} - $errorBody")
                     CommonResponse(-1, "DeepSeek API Error: ${response.code}", null)
                 }
             } catch (e: Exception) {
@@ -379,17 +392,17 @@ class MainController {
         System.setProperty("http.proxyPort", "7890");
         System.setProperty("https.proxyHost", "127.0.0.1");
         System.setProperty("https.proxyPort", "7890");
-        println("TranslationByGoogle")
+        println2("TranslationByGoogle")
         val translateService = TranslateOptions.getDefaultInstance().service
         var sourceLanguage = param.sourceLanguage
         if (sourceLanguage.isNullOrEmpty()) {
             val detection = translateService.detect(param.content)
             sourceLanguage = detection.language
-            println("检测到语言:$sourceLanguage")
+            println2("检测到语言:$sourceLanguage")
         }
         try {
             val translateResult = translateService.translate(param.content, Translate.TranslateOption.sourceLanguage(sourceLanguage), Translate.TranslateOption.targetLanguage(param.targetLanguage))
-            println("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
+            println2("翻译结果：${translateResult.translatedText} model:${translateResult.model}")
             return CommonResponse(200, "", TranslationResult().apply {
                 this.sourceLanguage = param.sourceLanguage
                 targetLanguage = param.targetLanguage
@@ -433,7 +446,7 @@ class MainController {
         if (mainLanguageList.isNotEmpty()) {
             //创建zip目录
             val currentDir = System.getProperty("user.dir")
-            println("当前目录：$currentDir")
+            println2("当前目录：$currentDir")
             val cacheDir = File("$currentDir/cache")
             if (cacheDir.exists()) {
                 cacheDir.listFiles()?.forEach {
@@ -516,7 +529,7 @@ class MainController {
                 }
             }.write("$fileDir/$mainProjectId.xlsx")
 
-            println("合并excel完毕：$fileDir/$mainProjectId.xlsx")
+            println2("合并excel完毕：$fileDir/$mainProjectId.xlsx")
             val readBytes = File("$fileDir/$mainProjectId.xlsx").readBytes()
             val headers = HttpHeaders()
             headers.setContentDispositionFormData("attachment", "$mainProjectId.xlsx")
@@ -540,7 +553,7 @@ class MainController {
         if (mainLanguageList.isNotEmpty()) {
             //创建zip目录
             val currentDir = System.getProperty("user.dir")
-            println("当前目录：$currentDir")
+            println2("当前目录：$currentDir")
             val cacheDir = File("$currentDir/cache")
             if (cacheDir.exists()) {
                 cacheDir.listFiles()?.forEach {
@@ -623,7 +636,7 @@ class MainController {
                 }
             }.write("$fileDir/$mainProjectId.xlsx")
 
-            println("合并excel完毕：$fileDir/$mainProjectId.xlsx")
+            println2("合并excel完毕：$fileDir/$mainProjectId.xlsx")
             val readBytes = File("$fileDir/$mainProjectId.xlsx").readBytes()
             val headers = HttpHeaders()
             headers.setContentDispositionFormData("attachment", "$mainProjectId.xlsx")
@@ -668,7 +681,7 @@ class MainController {
         if (mainLanguageList.isNotEmpty()) {
             //创建zip目录
             val currentDir = System.getProperty("user.dir")
-            println("当前目录：$currentDir")
+            println2("当前目录：$currentDir")
             val cacheDir = File("$currentDir/cache")
             if (cacheDir.exists()) {
                 cacheDir.listFiles()?.forEach {
@@ -706,7 +719,7 @@ class MainController {
                     }
                 }
 
-                println("查询到翻译数量：${translationInLanguage.size}")
+                println2("查询到翻译数量：${translationInLanguage.size}")
 
                 //创建目录
                 val dirName = when (language.languageName) {
@@ -721,13 +734,13 @@ class MainController {
                 val languageDir = File("$cacheDir/$dirName")
                 if (!languageDir.exists()) {
                     val success = languageDir.mkdirs()
-                    println("创建目录$languageDir $success")
+                    println2("创建目录$languageDir $success")
                 }
                 languageDirList.add(languageDir)
 
                 val file = File(languageDir, "Localizable.strings")
                 file.createNewFile()
-                println("创建${file.absolutePath}")
+                println2("创建${file.absolutePath}")
                 FileOutputStream(file).use { fos ->
                     translationInLanguage.let { translationList ->
                         translationList.forEach { translation ->
@@ -774,7 +787,7 @@ class MainController {
                             }
                         }
                     }
-                    println("已合并翻译：${hideTranslationList.size}")
+                    println2("已合并翻译：${hideTranslationList.size}")
                     hideTranslationList.forEach { hideTranslation ->
                         val mergeTranslation = "//【${hideTranslation.referto}】 ${hideTranslation.translationKey} = ${hideTranslation.translationContent}\n"
                         fos.write(mergeTranslation.toByteArray())
@@ -801,7 +814,7 @@ class MainController {
                 }
             }
 
-            println("压缩完毕：${zipFile.absolutePath}")
+            println2("压缩完毕：${zipFile.absolutePath}")
             val readBytes = zipFile.readBytes()
             val headers = HttpHeaders()
             headers.setContentDispositionFormData("attachment", "strings.zip")
@@ -827,7 +840,7 @@ class MainController {
         if (manLanguageList.isNotEmpty()) {
             //创建zip目录
             val currentDir = System.getProperty("user.dir")
-            println("当前目录：$currentDir")
+            println2("当前目录：$currentDir")
             val cacheDir = File("$currentDir/cache")
             if (cacheDir.exists()) {
                 cacheDir.listFiles()?.forEach {
@@ -864,7 +877,7 @@ class MainController {
                         }
                     }
                 }
-                println("查询到翻译数量：${translationInLanguage.size}")
+                println2("查询到翻译数量：${translationInLanguage.size}")
                 //创建目录
                 val dirName = when (language.languageName) {
                     "en" -> "values"
@@ -878,7 +891,7 @@ class MainController {
                 val languageDir = File("$cacheDir/$dirName")
                 if (!languageDir.exists()) {
                     val success = languageDir.mkdirs()
-                    println("创建目录$languageDir $success")
+                    println2("创建目录$languageDir $success")
                 }
                 languageDirList.add(languageDir)
 
@@ -919,7 +932,7 @@ class MainController {
                 }
                 xmlDoc.appendChild(resources)
                 val xmlFile = File(languageDir, "strings.xml")
-                println("创建${xmlFile.absolutePath}")
+                println2("创建${xmlFile.absolutePath}")
                 val success = xmlFile.createNewFile()
                 print("$success")
                 val transformFactory = TransformerFactory.newInstance()
@@ -950,7 +963,7 @@ class MainController {
                 }
             }
 
-            println("压缩完毕：${zipFile.absolutePath}")
+            println2("压缩完毕：${zipFile.absolutePath}")
             val readBytes = zipFile.readBytes()
             val headers = HttpHeaders()
             headers.setContentDispositionFormData("attachment", "strings.zip")
@@ -962,26 +975,26 @@ class MainController {
 
     private fun deleteCache(cacheDirFile: File) {
         if (cacheDirFile.isFile) {
-            println("删除：${cacheDirFile.absolutePath}")
+            println2("删除：${cacheDirFile.absolutePath}")
             cacheDirFile.delete()
         } else {
-            println("遍历目录：${cacheDirFile.absolutePath}")
+            println2("遍历目录：${cacheDirFile.absolutePath}")
             val listFiles = cacheDirFile.listFiles()
             listFiles?.forEach {
                 if (it.isFile) {
-                    println("删除：${it.absolutePath}")
+                    println2("删除：${it.absolutePath}")
                     it.delete()
                 } else {
                     deleteCache(it)
                 }
             }
-            println("删除目录：${cacheDirFile.absolutePath}")
+            println2("删除目录：${cacheDirFile.absolutePath}")
             cacheDirFile.delete()
         }
     }
 
     private fun addFilesToZip(directory: String, parentDirectoryName: String, zipOut: ZipOutputStream) {
-        println(" addFilesToZip($directory: String, $parentDirectoryName: String, zipOut: ZipOutputStream)")
+        println2(" addFilesToZip($directory: String, $parentDirectoryName: String, zipOut: ZipOutputStream)")
         val folder = File(directory)
         if (folder.exists()) {
             folder.listFiles()?.forEach { file ->
@@ -1015,7 +1028,7 @@ class MainController {
     fun helloWorld() {
         log(mRequest?.remoteAddr, "sayHello")
         val currentDir = System.getProperty("user.dir")
-        println("当前目录：$currentDir")
+        println2("当前目录：$currentDir")
         val fileDir = File("$currentDir/files")
         deleteCache(fileDir)
 
@@ -1034,7 +1047,7 @@ class MainController {
             CommonResponse(-1, "文件为空", null)
         } else {
             try {
-                println("接收到文件：$filename")
+                println2("接收到文件：$filename")
                 getParserForFile(filename).let { parser ->
                     val content = if (parser is ExcelParser) "" else String(file.bytes, Charsets.UTF_8)
                     val translations = parser.parse(content, file.inputStream)
@@ -1045,7 +1058,7 @@ class MainController {
                 CommonResponse(-1, e.message, null)
             }
         }
-        println("解析$filename 翻译数量：${response.data?.translationRowList?.size} 花费时间：ms${System.currentTimeMillis() - startTime}")
+        println2("解析$filename 翻译数量：${response.data?.translationRowList?.size} 花费时间：ms${System.currentTimeMillis() - startTime}")
         return response
     }
 

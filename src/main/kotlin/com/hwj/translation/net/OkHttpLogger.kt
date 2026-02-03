@@ -1,5 +1,6 @@
 package com.hwj.translation.net
 
+import com.hwj.translation.println2
 import okhttp3.Interceptor
 import okhttp3.MediaType
 import okhttp3.RequestBody
@@ -26,7 +27,7 @@ class OkHttpLogger : Interceptor {
             @JvmField
             val DEFAULT: Logger = object : Logger {
                 override fun log(message: String) {
-                    println("LongSeHttp:$message")
+                    println2("LongSeHttp:$message")
                 }
             }
         }
@@ -75,7 +76,7 @@ class OkHttpLogger : Interceptor {
                     logTextSB.append("Request Header:${headers.name(i)}:${headers.value(i)}\n")
                 }
             } else {
-                println("LongSeHttp Request Header empty!")
+                println2("LongSeHttp Request Header empty!")
             }
         }
         val logBody = level == Level.BODY_ONLY || level == Level.BODY
